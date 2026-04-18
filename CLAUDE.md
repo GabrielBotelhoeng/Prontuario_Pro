@@ -15,6 +15,7 @@ npm run preview      # Preview do build de produção
 ```
 
 Para rodar um teste específico:
+
 ```bash
 npx vitest run src/path/to/file.test.ts
 ```
@@ -24,6 +25,7 @@ npx vitest run src/path/to/file.test.ts
 **Prontuario-Pro** é um SPA React (frontend only) para gestão de prontuários médicos no Brasil. Sem backend configurado — dados são placeholder, React Query está pronto para integração futura.
 
 ### Fluxo principal
+
 ```
 index.html → src/main.tsx → src/App.tsx (BrowserRouter + QueryClientProvider)
                                    ↓
@@ -31,29 +33,33 @@ index.html → src/main.tsx → src/App.tsx (BrowserRouter + QueryClientProvider
 ```
 
 ### Dois contextos de usuário
+
 - **Médico** (`/medico/*`): Dashboard, prescrição digital, anamnese, agenda, monitoramento, painel IA
 - **Paciente** (`/paciente/*`): Dashboard, prontuário, agendamento, receitas, busca de especialistas
 - **Auth** (`/`, `/cadastro`, `/esqueci-senha`): Login unificado com toggle médico/paciente (CRM vs CPF)
 
 ### Layouts compartilhados
+
 - `src/components/AuthLayout.tsx` — wrapper para páginas de autenticação com gradiente
 - `src/components/DashboardLayout.tsx` — sidebar colapsível + header para páginas autenticadas
 - `src/components/NavLink.tsx` — link de navegação com estado ativo
 
 ### Stack
-| Camada | Tecnologias |
-|--------|------------|
-| UI | React 18 + TypeScript 5, shadcn/ui (Radix UI + Tailwind CSS) |
-| Roteamento | React Router DOM 6 |
-| Formulários | React Hook Form + Zod |
-| Estado servidor | TanStack React Query 5 |
-| Ícones | Lucide React |
-| Gráficos | Recharts |
-| Temas | next-themes (light/dark via CSS variables) |
-| Build | Vite 8 + SWC |
-| Testes | Vitest + Testing Library + jsdom |
+
+| Camada          | Tecnologias                                                  |
+| --------------- | ------------------------------------------------------------ |
+| UI              | React 18 + TypeScript 5, shadcn/ui (Radix UI + Tailwind CSS) |
+| Roteamento      | React Router DOM 6                                           |
+| Formulários     | React Hook Form + Zod                                        |
+| Estado servidor | TanStack React Query 5                                       |
+| Ícones          | Lucide React                                                 |
+| Gráficos        | Recharts                                                     |
+| Temas           | next-themes (light/dark via CSS variables)                   |
+| Build           | Vite 8 + SWC                                                 |
+| Testes          | Vitest + Testing Library + jsdom                             |
 
 ### Path alias
+
 `@/` → `src/` (configurado em `vite.config.ts` e `tsconfig.app.json`)
 
 ## Convenções importantes
@@ -68,7 +74,9 @@ index.html → src/main.tsx → src/App.tsx (BrowserRouter + QueryClientProvider
 ## Configuração shadcn/ui
 
 Para adicionar novos componentes:
+
 ```bash
 npx shadcn@latest add [component-name]
 ```
+
 Componentes vão para `src/components/ui/`. Configuração em `components.json` (estilo: default, base color: slate).
