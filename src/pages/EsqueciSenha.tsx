@@ -3,15 +3,28 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import logoIcon from "@/assets/logo-icon.png";
+import { useAuth } from "@/contexts/AuthContext";
 
 const EsqueciSenha = () => {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState("");
+  const { resetPassword } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
+    setErro("");
+    setLoading(true);
+    try {
+      await resetPassword(email);
+      setSent(true);
+    } catch (err: any) {
+      setErro(err.message ?? "Erro ao enviar e-mail.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -82,18 +95,18 @@ const EsqueciSenha = () => {
                 </div>
               </div>
 
+              {erro && (
+                <p className="text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-xl px-4 py-2.5">
+                  {erro}
+                </p>
+              )}
               <button
                 type="submit"
-                className="
-                  w-full h-12 rounded-xl
-                  bg-primary text-primary-foreground font-semibold text-sm
-                  shadow-lg shadow-primary/20
-                  transition-all duration-300
-                  hover:opacity-90 hover:shadow-xl hover:shadow-primary/25
-                  active:opacity-95 active:scale-[0.99]
-                "
+                disabled={loading}
+                className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/20 transition-all duration-300 hover:opacity-90 active:scale-[0.99] disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                Enviar Link de Recuperação
+                {loading && <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />}
+                {loading ? "Enviando..." : "Enviar Link de Recuperação"}
               </button>
             </form>
 

@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Search, Bell, LogOut, ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import logoIcon from "@/assets/logo-icon.png";
 import {
   SidebarProvider,
@@ -89,10 +90,10 @@ function AppSidebar({ items }: { items: NavItem[] }) {
 
       {/* Logout at bottom */}
       <div className={cn("mt-auto pb-4 transition-all duration-300", collapsed ? "px-0" : "px-3")}>
-        <NavLink
-          to="/"
+        <button
+          onClick={() => signOut().then(() => navigate("/"))}
           className={cn(
-            "flex items-center rounded-xl text-sm font-medium text-white/55 transition-all duration-200 hover:bg-red-500/20 hover:text-red-200",
+            "w-full flex items-center rounded-xl text-sm font-medium text-white/55 transition-all duration-200 hover:bg-red-500/20 hover:text-red-200",
             collapsed ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2.5",
           )}
         >
@@ -105,7 +106,7 @@ function AppSidebar({ items }: { items: NavItem[] }) {
           >
             Sair
           </span>
-        </NavLink>
+        </button>
       </div>
     </Sidebar>
   );
@@ -114,17 +115,21 @@ function AppSidebar({ items }: { items: NavItem[] }) {
 interface DashboardLayoutProps {
   children: ReactNode;
   navItems: NavItem[];
-  userName: string;
-  userRole: string;
+  userName?: string;
+  userRole?: string;
 }
 
 export default function DashboardLayout({
   children,
   navItems,
-  userName,
-  userRole,
+  userName: userNameProp,
+  userRole: userRoleProp,
 }: DashboardLayoutProps) {
   const navigate = useNavigate();
+  const { profile, medico, signOut } = useAuth();
+
+  const userName = userNameProp ?? profile?.nome ?? "Usuário";
+  const userRole = userRoleProp ?? (medico ? `CRM ${medico.crm}` : profile?.tipo === "paciente" ? "Paciente" : "");
 
   return (
     <SidebarProvider>

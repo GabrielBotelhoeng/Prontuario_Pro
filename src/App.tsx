@@ -3,6 +3,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index.tsx";
 import EsqueciSenha from "./pages/EsqueciSenha.tsx";
 import Cadastro from "./pages/Cadastro.tsx";
@@ -27,24 +29,31 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/esqueci-senha" element={<EsqueciSenha />} />
-          <Route path="/cadastro" element={<Cadastro />} />
-          <Route path="/medico" element={<DashboardMedico />} />
-          <Route path="/medico/prescricao" element={<PrescricaoDigital />} />
-          <Route path="/medico/anamnese" element={<Anamnese />} />
-          <Route path="/medico/agenda" element={<Agenda />} />
-          <Route path="/medico/monitoramento" element={<PainelMonitoramento />} />
-          <Route path="/medico/painel-ia" element={<PainelIA />} />
-          <Route path="/paciente" element={<DashboardPaciente />} />
-          <Route path="/paciente/prontuario" element={<MeuProntuario />} />
-          <Route path="/paciente/agendamento" element={<AgendaPaciente />} />
-          <Route path="/paciente/receitas" element={<ReceitasPaciente />} />
-          <Route path="/paciente/especialistas" element={<Especialistas />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            {/* Públicas */}
+            <Route path="/" element={<Index />} />
+            <Route path="/esqueci-senha" element={<EsqueciSenha />} />
+            <Route path="/cadastro" element={<Cadastro />} />
+
+            {/* Médico */}
+            <Route path="/medico" element={<ProtectedRoute requiredTipo="medico"><DashboardMedico /></ProtectedRoute>} />
+            <Route path="/medico/prescricao" element={<ProtectedRoute requiredTipo="medico"><PrescricaoDigital /></ProtectedRoute>} />
+            <Route path="/medico/anamnese" element={<ProtectedRoute requiredTipo="medico"><Anamnese /></ProtectedRoute>} />
+            <Route path="/medico/agenda" element={<ProtectedRoute requiredTipo="medico"><Agenda /></ProtectedRoute>} />
+            <Route path="/medico/monitoramento" element={<ProtectedRoute requiredTipo="medico"><PainelMonitoramento /></ProtectedRoute>} />
+            <Route path="/medico/painel-ia" element={<ProtectedRoute requiredTipo="medico"><PainelIA /></ProtectedRoute>} />
+
+            {/* Paciente */}
+            <Route path="/paciente" element={<ProtectedRoute requiredTipo="paciente"><DashboardPaciente /></ProtectedRoute>} />
+            <Route path="/paciente/prontuario" element={<ProtectedRoute requiredTipo="paciente"><MeuProntuario /></ProtectedRoute>} />
+            <Route path="/paciente/agendamento" element={<ProtectedRoute requiredTipo="paciente"><AgendaPaciente /></ProtectedRoute>} />
+            <Route path="/paciente/receitas" element={<ProtectedRoute requiredTipo="paciente"><ReceitasPaciente /></ProtectedRoute>} />
+            <Route path="/paciente/especialistas" element={<ProtectedRoute requiredTipo="paciente"><Especialistas /></ProtectedRoute>} />
+
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

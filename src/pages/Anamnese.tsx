@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSalvarAnamnese } from "@/hooks/useAnamneses";
+import { usePacienteByConsultas } from "@/hooks/usePacientes";
+import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Home,
   FileText,
@@ -31,7 +36,6 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import patientRosa from "@/assets/patient-rosa.jpg";
 
 const navItems: NavItem[] = [
   { title: "Início", url: "/medico", icon: Home },
@@ -62,14 +66,15 @@ interface Pathology {
 }
 
 export default function Anamnese() {
+  const { profile } = useAuth();
+  const { data: pacientes = [] } = usePacienteByConsultas();
+  const salvarAnamnese = useSalvarAnamnese();
+  const { toast } = useToast();
+
+  const [pacienteId, setPacienteId] = useState("");
   const [queixa, setQueixa] = useState("");
   const [historicoFamiliar, setHistoricoFamiliar] = useState("");
-  const [vitals, setVitals] = useState({
-    pressao: "",
-    fc: "",
-    temp: "",
-    peso: "",
-  });
+  const [vitals, setVitals] = useState({ pressao: "", fc: "", temp: "", peso: "" });
   const [pathologies, setPathologies] = useState<Pathology[]>([
     { id: "diabetes", label: "Diabetes", active: false },
     { id: "hipertensao", label: "Hipertensão", active: false },
@@ -81,6 +86,7 @@ export default function Anamnese() {
     { id: "renal", label: "Insuficiência Renal", active: false },
   ]);
   const [cidSearch, setCidSearch] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   const togglePathology = (id: string) => {
     setPathologies((prev) =>
@@ -97,11 +103,28 @@ export default function Anamnese() {
     );
   }, [queixa, cidSearch]);
 
-  // IA: análise da queixa em tempo real
   const aiAnalyzing = queixa.trim().length > 5;
 
+  const handleSalvar = async () => {
+    if (!pacienteId) { toast({ title: "Selecione um paciente", variant: "destructive" }); return; }
+    setSalvando(true);
+    try {
+      await salvarAnamnese.mutateAsync({
+        paciente_id: pacienteId,
+        queixa_principal: queixa,
+        antecedentes_familiares: historicoFamiliar,
+        sinais_vitais: vitals,
+        patologias: pathologies.filter((p) => p.active).map((p) => p.label),
+      });
+      toast({ title: "Prontuário salvo com sucesso!" });
+    } catch { toast({ title: "Erro ao salvar prontuário", variant: "destructive" }); }
+    finally { setSalvando(false); }
+  };
+
+  const pacienteSelecionado = pacientes.find((p) => p.id === pacienteId);
+
   return (
-    <DashboardLayout navItems={navItems} userName="Dr. Carlos" userRole="Clínica Geral">
+    <DashboardLayout navItems={navItems}>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
@@ -124,34 +147,34 @@ export default function Anamnese() {
           style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)" }}
         >
           <div className="flex flex-col md:flex-row md:items-center gap-6">
-            <div className="relative flex-shrink-0">
-              <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-primary to-primary/50 opacity-80 blur-[2px]" />
-              <img
-                src={patientRosa}
-                alt="Rosa Maria da Silva"
-                className="relative w-24 h-24 lg:w-28 lg:h-28 rounded-full object-cover border-[3px] border-card ring-2 ring-primary/40"
-              />
-            </div>
-
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">
-                  Rosa Maria da Silva
-                </h2>
-                <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/15 rounded-full text-[10px] font-semibold uppercase tracking-wider">
-                  Em consulta
-                </Badge>
+              <div className="mb-4">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Selecionar Paciente</Label>
+                <Select value={pacienteId} onValueChange={setPacienteId}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background max-w-sm">
+                    <SelectValue placeholder="Selecionar paciente..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {pacientes.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.profile?.nome ?? "Paciente"} — CPF {p.cpf}</SelectItem>
+                    ))}
+                    {pacientes.length === 0 && <SelectItem value="_none" disabled>Nenhum paciente com consultas</SelectItem>}
+                  </SelectContent>
+                </Select>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Paciente desde março de 2021 · Última consulta há 2 meses
-              </p>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <PatientStat icon={CalendarRange} label="Idade" value="44 anos" />
-                <PatientStat icon={IdCard} label="CPF" value="000.000.000-00" />
-                <PatientStat icon={Droplet} label="Tipo Sanguíneo" value="O+" />
-                <PatientStat icon={UserSquare2} label="Convênio" value="Particular" />
-              </div>
+              {pacienteSelecionado && (
+                <>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">{pacienteSelecionado.profile?.nome}</h2>
+                    <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/15 rounded-full text-[10px] font-semibold uppercase tracking-wider">Em consulta</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                    <PatientStat icon={IdCard} label="CPF" value={pacienteSelecionado.cpf} />
+                    {pacienteSelecionado.tipo_sanguineo && <PatientStat icon={Droplet} label="Tipo Sanguíneo" value={pacienteSelecionado.tipo_sanguineo} />}
+                    {pacienteSelecionado.alergias?.length ? <PatientStat icon={UserSquare2} label="Alergias" value={pacienteSelecionado.alergias.join(", ")} /> : null}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -392,12 +415,10 @@ export default function Anamnese() {
             <Printer className="h-4 w-4" />
             Imprimir Relatório
           </Button>
-          <Button 
-            onClick={() => { /* TODO: Implementar lógica no Cursor - Salvar Prontuário */ }}
-            className="rounded-xl gap-2 shadow-sm"
-          >
+          <Button onClick={handleSalvar} disabled={salvando} className="rounded-xl gap-2 shadow-sm">
+            {salvando && <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />}
             <Save className="h-4 w-4" />
-            Salvar Prontuário
+            {salvando ? "Salvando..." : "Salvar Prontuário"}
           </Button>
         </div>
       </div>
