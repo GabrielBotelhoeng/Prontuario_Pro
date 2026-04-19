@@ -24,3 +24,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code / AIOX — não vai para o repositório
+.claude/
+.cursor/
+CLAUDE.md
+REVIEW.md
+"Meu segundo cerebro/"

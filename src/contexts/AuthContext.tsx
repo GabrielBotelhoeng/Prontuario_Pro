@@ -19,7 +19,7 @@ interface AuthContextType {
   paciente: Paciente | null;
   loading: boolean;
   signIn: (tipo: "medico" | "paciente", documento: string, senha: string) => Promise<void>;
-  signUp: (data: SignUpData) => Promise<void>;
+  signUp: (data: SignUpData) => Promise<{ needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function signUp(data: SignUpData) {
+  async function signUp(data: SignUpData): Promise<{ needsConfirmation: boolean }> {
     const { data: authData, error } = await supabase.auth.signUp({
       email: data.email,
       password: data.senha,
@@ -139,8 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error) throw new Error(error.message);
 
-    // Belt-and-suspenders: se o usuário já tem sessão (confirmação de e-mail desativada),
-    // garante que o perfil foi criado mesmo se o trigger falhou
+    // Se sessão existe (email confirmation desativado), garante que o perfil foi criado
     if (authData.session) {
       await supabase.rpc("upsert_user_profile", {
         p_nome: data.nome,
@@ -149,6 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         p_especialidade: data.especialidade ?? "Clínica Geral",
       });
     }
+
+    return { needsConfirmation: !authData.session };
   }
 
   async function signOut() {

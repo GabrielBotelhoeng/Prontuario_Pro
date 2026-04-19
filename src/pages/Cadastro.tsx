@@ -14,6 +14,7 @@ import {
 import AuthLayout from "@/components/AuthLayout";
 import logoIcon from "@/assets/logo-icon.png";
 import { useAuth } from "@/contexts/AuthContext";
+import { maskCPF, filterCRM } from "@/lib/masks";
 
 type Profile = "paciente" | "medico";
 
@@ -29,12 +30,21 @@ const Cadastro = () => {
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
+  const [emailConfirmRequired, setEmailConfirmRequired] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const update =
     (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const updateDocumento = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked =
+      profile === "paciente"
+        ? maskCPF(e.target.value)
+        : filterCRM(e.target.value);
+    setForm((f) => ({ ...f, documento: masked }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,14 +62,18 @@ const Cadastro = () => {
 
     setLoading(true);
     try {
-      await signUp({
+      const { needsConfirmation } = await signUp({
         nome: form.nome,
         email: form.email,
         documento: form.documento,
         senha: form.senha,
         tipo: profile,
       });
-      navigate(profile === "medico" ? "/medico" : "/paciente");
+      if (needsConfirmation) {
+        setEmailConfirmRequired(true);
+      } else {
+        navigate(profile === "medico" ? "/medico" : "/paciente");
+      }
     } catch (err: any) {
       setErro(err.message ?? "Erro ao criar conta. Tente novamente.");
     } finally {
@@ -100,7 +114,7 @@ const Cadastro = () => {
               <button
                 key={key}
                 type="button"
-                onClick={() => setProfile(key)}
+                onClick={() => { setProfile(key); setForm(f => ({ ...f, documento: "" })); setEmailConfirmRequired(false); setErro(""); }}
                 className={`group relative rounded-xl border p-4 text-left transition-all duration-300 ${
                   active
                     ? "border-primary bg-primary/[0.04] shadow-sm shadow-primary/10"
@@ -129,9 +143,10 @@ const Cadastro = () => {
           <FormField
             label={profile === "medico" ? "CRM" : "CPF"}
             icon={IdCard}
-            placeholder={profile === "medico" ? "Digite seu CRM" : "000.000.000-00"}
+            placeholder={profile === "medico" ? "Ex: 123456/SP" : "000.000.000-00"}
+            maxLength={profile === "paciente" ? 14 : 12}
             value={form.documento}
-            onChange={update("documento")}
+            onChange={updateDocumento}
           />
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Senha" icon={Lock} type="password" placeholder="••••••••" value={form.senha} onChange={update("senha")} />
@@ -150,6 +165,13 @@ const Cadastro = () => {
               <a className="text-primary font-medium hover:underline underline-offset-4 cursor-pointer">política de privacidade</a>
             </span>
           </label>
+
+          {emailConfirmRequired && (
+            <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+              <p className="font-medium mb-0.5">Conta criada com sucesso!</p>
+              <p>Verifique seu e-mail <strong>{form.email}</strong> e clique no link de confirmação para ativar sua conta.</p>
+            </div>
+          )}
 
           {erro && (
             <p className="text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-xl px-4 py-2.5">
@@ -185,9 +207,10 @@ interface FormFieldProps {
   placeholder?: string;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  maxLength?: number;
 }
 
-const FormField = ({ label, icon: Icon, type = "text", placeholder, value, onChange }: FormFieldProps) => (
+const FormField = ({ label, icon: Icon, type = "text", placeholder, value, onChange, maxLength }: FormFieldProps) => (
   <div className="space-y-1.5">
     <label className="text-foreground text-sm font-medium">{label}</label>
     <div className="relative">
@@ -198,6 +221,7 @@ const FormField = ({ label, icon: Icon, type = "text", placeholder, value, onCha
         value={value}
         onChange={onChange}
         placeholder={placeholder}
+        maxLength={maxLength}
         className="w-full h-11 pl-11 pr-4 rounded-xl bg-muted/40 border border-border text-foreground text-sm placeholder:text-muted-foreground/50 outline-none transition-all duration-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 focus:bg-white"
       />
     </div>
