@@ -31,3 +31,7 @@ dist-ssr
 CLAUDE.md
 REVIEW.md
 "Meu segundo cerebro/"
+
+# Planejamento e configurações locais
+.planning/
+.windsurf/rules
