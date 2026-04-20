@@ -33,14 +33,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function loadUserData(userId: string) {
+  async function loadUserData(userId: string, tentativa = 0) {
     const { data: profileData } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
 
-    if (!profileData) return;
+    if (!profileData) {
+      if (tentativa < 3) {
+        await new Promise((r) => setTimeout(r, 800));
+        return loadUserData(userId, tentativa + 1);
+      }
+      return;
+    }
     setProfile(profileData as Profile);
 
     if (profileData.tipo === "medico") {
@@ -125,6 +131,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(data: SignUpData): Promise<{ needsConfirmation: boolean }> {
+    const docNormalizado =
+      data.tipo === "paciente"
+        ? data.documento.replace(/[^0-9]/g, "")
+        : data.documento.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+
     const { data: authData, error } = await supabase.auth.signUp({
       email: data.email,
       password: data.senha,
@@ -132,21 +143,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           nome: data.nome,
           tipo: data.tipo,
-          documento: data.documento,
+          documento: docNormalizado,
           especialidade: data.especialidade ?? "Clínica Geral",
         },
       },
     });
-    if (error) throw new Error(error.message);
+
+    if (error) {
+      const status = (error as any).status;
+      const msg = error.message.toLowerCase();
+      if (status === 422 || msg.includes("422")) {
+        if (msg.includes("already") || msg.includes("email address") || msg.includes("already registered")) {
+          throw new Error("E-mail já cadastrado. Use outro e-mail ou faça login.");
+        }
+        throw new Error("Dados inválidos no cadastro. Verifique as informações e tente novamente.");
+      }
+      throw new Error(error.message);
+    }
 
     // Se sessão existe (email confirmation desativado), garante que o perfil foi criado
     if (authData.session) {
-      await supabase.rpc("upsert_user_profile", {
-        p_nome: data.nome,
-        p_tipo: data.tipo,
-        p_documento: data.documento,
-        p_especialidade: data.especialidade ?? "Clínica Geral",
-      });
+      try {
+        await supabase.rpc("upsert_user_profile", {
+          p_nome: data.nome,
+          p_tipo: data.tipo,
+          p_documento: docNormalizado,
+          p_especialidade: data.especialidade ?? "Clínica Geral",
+        });
+      } catch (upsertErr) {
+        console.warn("[signUp] upsert_user_profile falhou (não crítico):", upsertErr);
+      }
     }
 
     return { needsConfirmation: !authData.session };
