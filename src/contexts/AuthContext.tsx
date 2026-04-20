@@ -121,11 +121,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("[signIn] signInWithPassword erro:", error.message, error);
       const msg = error.message.toLowerCase();
       if (msg.includes("email not confirmed") || msg.includes("not confirmed")) {
-        throw new Error("E-mail não confirmado. Verifique sua caixa de entrada.");
+        throw new Error("Cadastro não confirmado. Verifique sua caixa de entrada e clique no link de ativação.");
       }
-      // "Invalid login credentials" pode ser senha errada OU e-mail não confirmado
       if (msg.includes("invalid login credentials") || msg.includes("invalid credentials")) {
-        throw new Error("Senha incorreta ou e-mail não confirmado. Verifique os dados.");
+        throw new Error(
+          tipo === "medico"
+            ? "Senha incorreta. Verifique a senha cadastrada."
+            : "Senha incorreta. Verifique a senha cadastrada."
+        );
       }
       throw new Error("Erro ao fazer login: " + error.message);
     }
