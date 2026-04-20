@@ -22,8 +22,8 @@ const Index = () => {
     try {
       await signIn(userType, cpfCrm.trim(), senha);
       navigate(userType === "medico" ? "/medico" : "/paciente");
-    } catch (err: any) {
-      setErro(err.message ?? "Erro ao fazer login.");
+    } catch (err: unknown) {
+      setErro((err as Error).message ?? "Erro ao fazer login.");
     } finally {
       setLoading(false);
     }

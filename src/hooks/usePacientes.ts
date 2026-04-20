@@ -48,7 +48,7 @@ export function usePacienteByConsultas() {
         .eq("medico_id", user!.id);
       if (error) throw error;
       const unique = new Map<string, Paciente>();
-      data?.forEach((c: any) => {
+      data?.forEach((c: { paciente?: Paciente & { profile: { nome: string; email: string; avatar_url: string | null } } }) => {
         if (c.paciente) unique.set(c.paciente.id, c.paciente);
       });
       return Array.from(unique.values()) as (Paciente & { profile: { nome: string; email: string; avatar_url: string | null } })[];

@@ -25,6 +25,6 @@ export function maskCEP(value: string): string {
 export function filterCRM(value: string): string {
   return value
     .toUpperCase()
-    .replace(/[^0-9A-Z\/\-]/g, "")
+    .replace(/[^0-9A-Z/-]/g, "")
     .slice(0, 12);
 }

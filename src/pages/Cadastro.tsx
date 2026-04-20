@@ -74,8 +74,8 @@ const Cadastro = () => {
       } else {
         navigate(profile === "medico" ? "/medico" : "/paciente");
       }
-    } catch (err: any) {
-      setErro(err.message ?? "Erro ao criar conta. Tente novamente.");
+    } catch (err: unknown) {
+      setErro((err as Error).message ?? "Erro ao criar conta. Tente novamente.");
     } finally {
       setLoading(false);
     }

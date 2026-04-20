@@ -20,8 +20,8 @@ const EsqueciSenha = () => {
     try {
       await resetPassword(email);
       setSent(true);
-    } catch (err: any) {
-      setErro(err.message ?? "Erro ao enviar e-mail.");
+    } catch (err: unknown) {
+      setErro((err as Error).message ?? "Erro ao enviar e-mail.");
     } finally {
       setLoading(false);
     }

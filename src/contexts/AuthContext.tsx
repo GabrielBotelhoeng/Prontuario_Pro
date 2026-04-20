@@ -85,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function signIn(tipo: "medico" | "paciente", documento: string, senha: string) {
@@ -150,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) {
-      const status = (error as any).status;
+      const status = (error as { status?: number }).status;
       const msg = error.message.toLowerCase();
       if (status === 422 || msg.includes("422")) {
         if (msg.includes("already") || msg.includes("email address") || msg.includes("already registered")) {

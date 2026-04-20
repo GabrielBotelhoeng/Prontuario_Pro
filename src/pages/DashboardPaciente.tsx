@@ -115,7 +115,7 @@ export default function DashboardPaciente() {
                   </div>
                   <div>
                     <p className="text-foreground font-semibold text-[15px]">{m?.profile?.nome ?? "Médico"}</p>
-                    <p className="text-muted-foreground text-sm">{(m as any)?.especialidade}</p>
+                    <p className="text-muted-foreground text-sm">{(m as { especialidade?: string })?.especialidade}</p>
                   </div>
                   <UserCheck className="ml-auto h-4 w-4 text-primary/40" />
                 </div>

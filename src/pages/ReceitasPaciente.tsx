@@ -59,7 +59,7 @@ export default function ReceitasPaciente() {
                   <p className="text-xs text-muted-foreground mt-0.5">Emitida em {format(new Date(p.data_emissao), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
                   {Array.isArray(p.medicamentos) && p.medicamentos.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {(p.medicamentos as any[]).slice(0, 3).map((m, i) => (
+                      {(p.medicamentos as { name: string; dosage: string }[]).slice(0, 3).map((m, i) => (
                         <span key={i} className="text-[11px] bg-muted/60 border border-border/40 rounded-lg px-2 py-0.5 text-muted-foreground">{m.name} {m.dosage}</span>
                       ))}
                       {p.medicamentos.length > 3 && <span className="text-[11px] text-primary font-medium">+{p.medicamentos.length - 3} mais</span>}
