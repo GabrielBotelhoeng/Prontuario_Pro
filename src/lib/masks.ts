@@ -30,6 +30,6 @@ export function filterCRM(value: string): string {
 }
 
 export function maskCRM(value: string): string {
-  const cleaned = value.toUpperCase().replace(/[^0-9A-Z\/\-]/g, '')
+  const cleaned = value.toUpperCase().replace(/[^0-9A-Z/-]/g, '')
   return cleaned.slice(0, 9)
 }
