@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { Prescricao, MedicamentoItem } from "@/lib/database.types";
@@ -28,6 +29,34 @@ export function usePrescricoesMedico() {
 
 export function usePrescricoesPaciente() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`prescricoes-paciente-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "prescricoes",
+          filter: `paciente_id=eq.${user.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ["prescricoes", "paciente", user.id],
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
+
   return useQuery({
     queryKey: ["prescricoes", "paciente", user?.id],
     enabled: !!user?.id,
