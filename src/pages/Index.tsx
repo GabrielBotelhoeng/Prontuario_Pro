@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { maskCPF, maskCRM } from "@/lib/masks";
 import doctorHero from "@/assets/doctor-hero.jpg";
 import logoIcon from "@/assets/logo-icon.png";
 
@@ -119,7 +120,10 @@ const Index = () => {
                 <input
                   type="text"
                   value={cpfCrm}
-                  onChange={(e) => setCpfCrm(e.target.value)}
+                  onChange={(e) =>
+                    setCpfCrm(userType === "medico" ? maskCRM(e.target.value) : maskCPF(e.target.value))
+                  }
+                  maxLength={userType === "medico" ? 9 : 14}
                   placeholder={userType === "medico" ? "Digite seu CRM" : "000.000.000-00"}
                   required
                   className="w-full h-12 px-4 rounded-xl bg-muted/40 border border-border text-foreground text-sm placeholder:text-muted-foreground/50 outline-none transition-all duration-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 focus:bg-white"
