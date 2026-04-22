@@ -100,3 +100,15 @@ export interface Notificacao {
   tipo: "consulta" | "receita" | "alerta" | "sistema";
   created_at: string;
 }
+
+export interface Documento {
+  id: string;
+  paciente_id: string;
+  uploaded_by: string;
+  consulta_id: string | null;
+  nome: string;
+  storage_path: string;
+  tipo_arquivo: "pdf" | "jpg" | "jpeg" | "png";
+  tamanho_bytes: number | null;
+  created_at: string;
+}

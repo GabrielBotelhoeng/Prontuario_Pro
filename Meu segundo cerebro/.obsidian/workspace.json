@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "fc45606e24465d63",
+        "id": "3a4ed5bca31e6437",
         "type": "tabs",
         "children": [
           {
-            "id": "f527974654d5ed75",
+            "id": "c84722a399c7bfcf",
             "type": "leaf",
             "state": {
               "type": "empty",
@@ -179,6 +179,10 @@
   },
   "active": "684fa43aeb98db88",
   "lastOpenFiles": [
+    "2026-04-21.md",
+    "01 - Projetos/Prontuario Pro/Backlog.md",
+    "01 - Projetos/Prontuario Pro",
+    "01 - Projetos",
     "Bem-vindo.md"
   ]
 }

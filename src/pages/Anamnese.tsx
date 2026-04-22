@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSalvarAnamnese } from "@/hooks/useAnamneses";
 import { usePacienteByConsultas } from "@/hooks/usePacientes";
+import { useDocumentosPacienteMedico, useUploadDocumento, useDeleteDocumento, downloadDocumento, validarArquivo } from "@/hooks/useDocumentos";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -27,6 +28,10 @@ import {
   CalendarRange,
   UserSquare2,
   Plus,
+  Paperclip,
+  Download,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { Input } from "@/components/ui/input";
@@ -66,12 +71,54 @@ interface Pathology {
 }
 
 export default function Anamnese() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { data: pacientes = [] } = usePacienteByConsultas();
   const salvarAnamnese = useSalvarAnamnese();
   const { toast } = useToast();
 
   const [pacienteId, setPacienteId] = useState("");
+
+  // Documentos do paciente selecionado
+  const { data: documentos = [], isLoading: loadingDocs } = useDocumentosPacienteMedico(pacienteId);
+  const uploadDocumento = useUploadDocumento();
+  const deleteDocumento = useDeleteDocumento();
+  const [nomeDoc, setNomeDoc] = useState("");
+  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleUploadMedico() {
+    if (!nomeDoc.trim()) {
+      toast({ title: "Nome obrigatório", description: "Informe um nome para o documento.", variant: "destructive" });
+      return;
+    }
+    if (!arquivoSelecionado) {
+      toast({ title: "Arquivo obrigatório", description: "Selecione um arquivo para enviar.", variant: "destructive" });
+      return;
+    }
+    const erro = validarArquivo(arquivoSelecionado);
+    if (erro) {
+      toast({ title: "Arquivo inválido", description: erro, variant: "destructive" });
+      return;
+    }
+    try {
+      await uploadDocumento.mutateAsync({ pacienteId, arquivo: arquivoSelecionado, nome: nomeDoc.trim() });
+      toast({ title: "Documento enviado", description: `"${nomeDoc}" salvo com sucesso.` });
+      setNomeDoc("");
+      setArquivoSelecionado(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch {
+      toast({ title: "Erro ao enviar", description: "Não foi possível enviar o documento.", variant: "destructive" });
+    }
+  }
+
+  async function handleDeleteMedico(doc: typeof documentos[number]) {
+    try {
+      await deleteDocumento.mutateAsync(doc);
+      toast({ title: "Documento excluído" });
+    } catch {
+      toast({ title: "Erro ao excluir", variant: "destructive" });
+    }
+  }
   const [queixa, setQueixa] = useState("");
   const [historicoFamiliar, setHistoricoFamiliar] = useState("");
   const [vitals, setVitals] = useState({ pressao: "", fc: "", temp: "", peso: "" });
@@ -396,6 +443,99 @@ export default function Anamnese() {
             </div>
           </aside>
         </div>
+
+        {/* Painel de Documentos do Paciente (D-06) */}
+        {pacienteId && (
+          <section className="bg-card border border-border/40 rounded-2xl p-6" style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)" }}>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Paperclip className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-foreground">Exames e Documentos</h3>
+                <p className="text-xs text-muted-foreground">Documentos do paciente selecionado</p>
+              </div>
+            </div>
+
+            {/* Formulário de upload */}
+            <div className="bg-muted/30 border border-border/40 rounded-xl p-4 mb-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Enviar documento</p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Input
+                  placeholder="Nome do documento (ex: Raio-X Tórax - Abr/2026)"
+                  value={nomeDoc}
+                  onChange={(e) => setNomeDoc(e.target.value)}
+                  className="flex-1"
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={(e) => setArquivoSelecionado(e.target.files?.[0] ?? null)}
+                />
+                <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="shrink-0">
+                  <Upload className="h-4 w-4 mr-2" />
+                  {arquivoSelecionado ? arquivoSelecionado.name.slice(0, 18) + (arquivoSelecionado.name.length > 18 ? "…" : "") : "Selecionar arquivo"}
+                </Button>
+                <Button onClick={handleUploadMedico} disabled={uploadDocumento.isPending} className="shrink-0">
+                  {uploadDocumento.isPending ? "Enviando…" : "Enviar"}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-2">PDF, JPG ou PNG · máximo 20 MB</p>
+            </div>
+
+            {/* Lista de documentos */}
+            {loadingDocs ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              </div>
+            ) : documentos.length === 0 ? (
+              <div className="border border-dashed border-border rounded-xl p-8 text-center">
+                <p className="text-sm text-muted-foreground">Nenhum documento para este paciente</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {documentos.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-border/40 bg-background">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Paperclip className="h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{doc.nome}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {doc.tipo_arquivo.toUpperCase()}
+                          {doc.tamanho_bytes ? ` · ${(doc.tamanho_bytes / 1024 / 1024).toFixed(1)} MB` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => downloadDocumento(doc).catch(() => toast({ title: "Erro ao baixar", variant: "destructive" }))}
+                        title="Baixar"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      {doc.uploaded_by === user?.id && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteMedico(doc)}
+                          disabled={deleteDocumento.isPending}
+                          className="text-destructive hover:text-destructive"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Footer actions */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 pt-2 pb-4">
