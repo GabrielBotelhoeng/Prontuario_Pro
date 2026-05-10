@@ -15,6 +15,7 @@ import AuthLayout from "@/components/AuthLayout";
 import logoIcon from "@/assets/logo-icon.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { maskCPF, filterCRM } from "@/lib/masks";
+import { useTodosMedicos } from "@/hooks/usePacientes";
 
 type Profile = "paciente" | "medico";
 
@@ -31,8 +32,10 @@ const Cadastro = () => {
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
   const [emailConfirmRequired, setEmailConfirmRequired] = useState(false);
+  const [medicoResponsavelId, setMedicoResponsavelId] = useState("");
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const { data: medicos = [] } = useTodosMedicos();
 
   const update =
     (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -68,6 +71,7 @@ const Cadastro = () => {
         documento: form.documento,
         senha: form.senha,
         tipo: profile,
+        medico_principal_id: profile === "paciente" && medicoResponsavelId ? medicoResponsavelId : undefined,
       });
       if (needsConfirmation) {
         setEmailConfirmRequired(true);
@@ -152,6 +156,29 @@ const Cadastro = () => {
             <FormField label="Senha" icon={Lock} type="password" placeholder="••••••••" value={form.senha} onChange={update("senha")} />
             <FormField label="Confirmar" icon={Lock} type="password" placeholder="••••••••" value={form.confirmar} onChange={update("confirmar")} />
           </div>
+
+          {profile === "paciente" && (
+            <div className="space-y-1.5">
+              <label className="text-foreground text-sm font-medium">
+                Médico responsável <span className="text-muted-foreground font-normal">(opcional)</span>
+              </label>
+              <div className="relative">
+                <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/60" size={17} strokeWidth={1.75} />
+                <select
+                  value={medicoResponsavelId}
+                  onChange={(e) => setMedicoResponsavelId(e.target.value)}
+                  className="w-full h-11 pl-11 pr-4 rounded-xl bg-muted/40 border border-border text-foreground text-sm outline-none transition-all duration-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 focus:bg-white appearance-none"
+                >
+                  <option value="">Selecionar depois</option>
+                  {medicos.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.profile?.nome ?? "Médico"} — CRM {m.crm} · {m.especialidade}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           <label className="flex items-start gap-3 pt-1 cursor-pointer group select-none">
             <span className={`mt-0.5 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[5px] border transition-all duration-300 ${accepted ? "bg-primary border-primary" : "bg-white border-border group-hover:border-primary/50"}`}>

@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreatePrescricao } from "@/hooks/usePrescricoes";
-import { usePacienteByConsultas } from "@/hooks/usePacientes";
+import { usePacientesDoMedico, useVincularPaciente } from "@/hooks/usePacientes";
 import { useToast } from "@/hooks/use-toast";
 import logoIcon from "@/assets/logo-icon.png";
 
@@ -61,18 +61,35 @@ const tipoReceitaAccent: Record<string, { stripe: string; label: string }> = {
 
 export default function PrescricaoDigital() {
   const { profile, medico } = useAuth();
-  const { data: pacientes = [] } = usePacienteByConsultas();
+  const { data: pacientes = [] } = usePacientesDoMedico();
+  const vincularPaciente = useVincularPaciente();
   const createPrescricao = useCreatePrescricao();
   const { toast } = useToast();
 
   const [tipoReceita, setTipoReceita] = useState<"simples" | "controle" | "branca" | "azul" | "amarela">("simples");
   const [pacienteId, setPacienteId] = useState("");
+  const [cpfVincular, setCpfVincular] = useState("");
+
+  async function handleVincular() {
+    if (!cpfVincular.trim()) {
+      toast({ title: "Informe um CPF", variant: "destructive" });
+      return;
+    }
+    try {
+      const p = await vincularPaciente.mutateAsync(cpfVincular);
+      toast({ title: "Paciente vinculado", description: `${p.nome} agora está na sua lista.` });
+      setCpfVincular("");
+      setPacienteId(p.id);
+    } catch (err: unknown) {
+      toast({ title: "Erro ao vincular", description: (err as Error).message, variant: "destructive" });
+    }
+  }
   const [medication, setMedication] = useState<Medication>({ id: "", name: "", dosage: "", quantity: "", posology: "" });
   const [medications, setMedications] = useState<Medication[]>([]);
   const [salvando, setSalvando] = useState(false);
 
   const pacienteSelecionado = pacientes.find((p) => p.id === pacienteId);
-  const pacienteNome = pacienteSelecionado?.profile?.nome ?? "";
+  const pacienteNome = pacienteSelecionado?.nome ?? "";
 
   const aiHint = useMemo(() => {
     const key = medication.name.trim().toLowerCase();
@@ -156,13 +173,24 @@ export default function PrescricaoDigital() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     {pacientes.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.profile?.nome ?? "Paciente"}</SelectItem>
+                      <SelectItem key={p.id} value={p.id}>{p.nome} — CPF {p.cpf}</SelectItem>
                     ))}
                     {pacientes.length === 0 && (
-                      <SelectItem value="_none" disabled>Nenhum paciente com consultas</SelectItem>
+                      <SelectItem value="_none" disabled>Nenhum paciente vinculado</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
+                <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                  <Input
+                    placeholder="Vincular paciente por CPF"
+                    value={cpfVincular}
+                    onChange={(e) => setCpfVincular(e.target.value)}
+                    className="h-10 rounded-xl flex-1"
+                  />
+                  <Button onClick={handleVincular} disabled={vincularPaciente.isPending} variant="outline" className="shrink-0">
+                    {vincularPaciente.isPending ? "Vinculando…" : "Vincular"}
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-2 sm:col-span-2">

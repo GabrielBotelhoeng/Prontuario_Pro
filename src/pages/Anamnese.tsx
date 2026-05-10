@@ -2,7 +2,7 @@ import { useMemo, useState, useRef } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSalvarAnamnese } from "@/hooks/useAnamneses";
-import { usePacienteByConsultas } from "@/hooks/usePacientes";
+import { usePacientesDoMedico, useVincularPaciente } from "@/hooks/usePacientes";
 import { useDocumentosPacienteMedico, useUploadDocumento, useDeleteDocumento, downloadDocumento, validarArquivo } from "@/hooks/useDocumentos";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -72,11 +72,28 @@ interface Pathology {
 
 export default function Anamnese() {
   const { profile, user } = useAuth();
-  const { data: pacientes = [] } = usePacienteByConsultas();
+  const { data: pacientes = [] } = usePacientesDoMedico();
+  const vincularPaciente = useVincularPaciente();
   const salvarAnamnese = useSalvarAnamnese();
   const { toast } = useToast();
 
   const [pacienteId, setPacienteId] = useState("");
+  const [cpfVincular, setCpfVincular] = useState("");
+
+  async function handleVincular() {
+    if (!cpfVincular.trim()) {
+      toast({ title: "Informe um CPF", variant: "destructive" });
+      return;
+    }
+    try {
+      const p = await vincularPaciente.mutateAsync(cpfVincular);
+      toast({ title: "Paciente vinculado", description: `${p.nome} agora está na sua lista.` });
+      setCpfVincular("");
+      setPacienteId(p.id);
+    } catch (err: unknown) {
+      toast({ title: "Erro ao vincular", description: (err as Error).message, variant: "destructive" });
+    }
+  }
 
   // Documentos do paciente selecionado
   const { data: documentos = [], isLoading: loadingDocs } = useDocumentosPacienteMedico(pacienteId);
@@ -203,22 +220,32 @@ export default function Anamnese() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     {pacientes.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.profile?.nome ?? "Paciente"} — CPF {p.cpf}</SelectItem>
+                      <SelectItem key={p.id} value={p.id}>{p.nome} — CPF {p.cpf}</SelectItem>
                     ))}
-                    {pacientes.length === 0 && <SelectItem value="_none" disabled>Nenhum paciente com consultas</SelectItem>}
+                    {pacientes.length === 0 && <SelectItem value="_none" disabled>Nenhum paciente vinculado</SelectItem>}
                   </SelectContent>
                 </Select>
+                <div className="mt-3 flex flex-col sm:flex-row gap-2 max-w-md">
+                  <Input
+                    placeholder="Vincular paciente por CPF"
+                    value={cpfVincular}
+                    onChange={(e) => setCpfVincular(e.target.value)}
+                    className="h-10 rounded-xl"
+                  />
+                  <Button onClick={handleVincular} disabled={vincularPaciente.isPending} className="shrink-0">
+                    {vincularPaciente.isPending ? "Vinculando…" : "Vincular"}
+                  </Button>
+                </div>
               </div>
               {pacienteSelecionado && (
                 <>
                   <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">{pacienteSelecionado.profile?.nome}</h2>
+                    <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">{pacienteSelecionado.nome}</h2>
                     <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/15 rounded-full text-[10px] font-semibold uppercase tracking-wider">Em consulta</Badge>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
                     <PatientStat icon={IdCard} label="CPF" value={pacienteSelecionado.cpf} />
-                    {pacienteSelecionado.tipo_sanguineo && <PatientStat icon={Droplet} label="Tipo Sanguíneo" value={pacienteSelecionado.tipo_sanguineo} />}
-                    {pacienteSelecionado.alergias?.length ? <PatientStat icon={UserSquare2} label="Alergias" value={pacienteSelecionado.alergias.join(", ")} /> : null}
+                    {pacienteSelecionado.email && <PatientStat icon={UserSquare2} label="E-mail" value={pacienteSelecionado.email} />}
                   </div>
                 </>
               )}
