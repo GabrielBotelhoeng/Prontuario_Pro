@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index.tsx";
 import EsqueciSenha from "./pages/EsqueciSenha.tsx";
+import ResetSenha from "./pages/ResetSenha.tsx";
 import Cadastro from "./pages/Cadastro.tsx";
 import DashboardMedico from "./pages/DashboardMedico.tsx";
 import DashboardPaciente from "./pages/DashboardPaciente.tsx";
@@ -34,6 +35,7 @@ const App = () => (
             {/* Públicas */}
             <Route path="/" element={<Index />} />
             <Route path="/esqueci-senha" element={<EsqueciSenha />} />
+            <Route path="/reset-senha" element={<ResetSenha />} />
             <Route path="/cadastro" element={<Cadastro />} />
 
             {/* Médico */}
