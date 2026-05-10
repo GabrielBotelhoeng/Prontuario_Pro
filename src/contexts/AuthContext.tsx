@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import type { Profile, Medico, Paciente } from "@/lib/database.types";
@@ -10,6 +10,7 @@ interface SignUpData {
   senha: string;
   tipo: "medico" | "paciente";
   especialidade?: string;
+  medico_principal_id?: string;
 }
 
 interface AuthContextType {
@@ -33,12 +34,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Rastreia o user.id em foco. Resultados de loadUserData que chegam
+  // após troca de sessão são descartados — evita race ao trocar de conta
+  // ou ao getSession/onAuthStateChange dispararem em paralelo no mount.
+  const currentUserIdRef = useRef<string | null>(null);
+
   async function loadUserData(userId: string, tentativa = 0) {
+    if (currentUserIdRef.current !== userId) return;
+
     const { data: profileData } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
+
+    if (currentUserIdRef.current !== userId) return;
 
     if (!profileData) {
       if (tentativa < 3) {
@@ -55,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select("*")
         .eq("id", userId)
         .single();
+      if (currentUserIdRef.current !== userId) return;
       setMedico(data as Medico);
     } else {
       const { data } = await supabase
@@ -62,29 +73,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select("*")
         .eq("id", userId)
         .single();
+      if (currentUserIdRef.current !== userId) return;
       setPaciente(data as Paciente);
     }
   }
 
   useEffect(() => {
+    let mounted = true;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) loadUserData(session.user.id).finally(() => setLoading(false));
+      if (!mounted) return;
+      const u = session?.user ?? null;
+      currentUserIdRef.current = u?.id ?? null;
+      setUser(u);
+      if (u) loadUserData(u.id).finally(() => mounted && setLoading(false));
       else setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadUserData(session.user.id);
-      } else {
+      if (!mounted) return;
+      const newUser = session?.user ?? null;
+      const newId = newUser?.id ?? null;
+
+      // Troca de usuário (ou logout): limpa estados antes de carregar os novos
+      // para não exibir dados do usuário anterior durante o intervalo.
+      if (currentUserIdRef.current !== newId) {
         setProfile(null);
         setMedico(null);
         setPaciente(null);
       }
+
+      currentUserIdRef.current = newId;
+      setUser(newUser);
+      if (newUser) loadUserData(newUser.id);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -177,6 +204,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (upsertErr) {
         console.warn("[signUp] upsert_user_profile falhou (não crítico):", upsertErr);
       }
+
+      // Paciente cadastrado escolheu médico responsável: vincula via update
+      // (RLS atual permite via pacientes_update_own).
+      if (data.tipo === "paciente" && data.medico_principal_id && authData.user?.id) {
+        try {
+          await supabase
+            .from("pacientes")
+            .update({ medico_principal_id: data.medico_principal_id })
+            .eq("id", authData.user.id);
+        } catch (vincErr) {
+          console.warn("[signUp] vínculo médico responsável falhou (não crítico):", vincErr);
+        }
+      }
     }
 
     return { needsConfirmation: !authData.session };
@@ -188,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function resetPassword(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/`,
+      redirectTo: `${window.location.origin}/reset-senha`,
     });
     if (error) throw new Error(error.message);
   }
