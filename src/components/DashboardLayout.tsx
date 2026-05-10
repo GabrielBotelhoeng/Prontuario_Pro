@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Search, Bell, LogOut, ChevronLeft } from "lucide-react";
+import { Search, Bell, LogOut, ChevronLeft, Check, Calendar, FileText, AlertTriangle, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +17,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  useNotificacoes,
+  useMarcarNotificacaoLida,
+  useMarcarTodasLidas,
+} from "@/hooks/useNotificacoes";
+import type { Notificacao } from "@/lib/database.types";
 
 export interface NavItem {
   title: string;
@@ -24,7 +31,7 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-function AppSidebar({ items }: { items: NavItem[] }) {
+function AppSidebar({ items, onLogout }: { items: NavItem[]; onLogout: () => void }) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
 
@@ -91,7 +98,7 @@ function AppSidebar({ items }: { items: NavItem[] }) {
       {/* Logout at bottom */}
       <div className={cn("mt-auto pb-4 transition-all duration-300", collapsed ? "px-0" : "px-3")}>
         <button
-          onClick={() => signOut().then(() => navigate("/"))}
+          onClick={onLogout}
           className={cn(
             "w-full flex items-center rounded-xl text-sm font-medium text-white/55 transition-all duration-200 hover:bg-red-500/20 hover:text-red-200",
             collapsed ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2.5",
@@ -109,6 +116,121 @@ function AppSidebar({ items }: { items: NavItem[] }) {
         </button>
       </div>
     </Sidebar>
+  );
+}
+
+function NotificacaoIcon({ tipo }: { tipo: Notificacao["tipo"] }) {
+  const map = {
+    consulta: Calendar,
+    receita: FileText,
+    alerta: AlertTriangle,
+    sistema: Info,
+  } as const;
+  const Icon = map[tipo] ?? Info;
+  return <Icon className="h-4 w-4 text-primary flex-shrink-0" />;
+}
+
+function formatRelativo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  return new Date(iso).toLocaleDateString("pt-BR");
+}
+
+function NotificacoesBell() {
+  const { data: notificacoes = [], isLoading } = useNotificacoes(10);
+  const marcarLida = useMarcarNotificacaoLida();
+  const marcarTodas = useMarcarTodasLidas();
+  const naoLidas = notificacoes.filter((n) => !n.lida).length;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="relative p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200">
+          <Bell className="h-[18px] w-[18px]" />
+          {naoLidas > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+              {naoLidas > 9 ? "9+" : naoLidas}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[360px] p-0 rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Notificações</p>
+            <p className="text-[11px] text-muted-foreground">
+              {naoLidas === 0 ? "Tudo em dia" : `${naoLidas} não lida(s)`}
+            </p>
+          </div>
+          {naoLidas > 0 && (
+            <button
+              onClick={() => marcarTodas.mutate()}
+              disabled={marcarTodas.isPending}
+              className="text-[11px] font-semibold text-primary hover:opacity-70 transition-opacity inline-flex items-center gap-1"
+            >
+              <Check className="h-3 w-3" />
+              Marcar todas
+            </button>
+          )}
+        </div>
+
+        <div className="max-h-[360px] overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            </div>
+          ) : notificacoes.length === 0 ? (
+            <div className="px-4 py-10 text-center">
+              <Bell className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground">Nenhuma notificação ainda</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {notificacoes.map((n) => (
+                <li key={n.id}>
+                  <button
+                    onClick={() => !n.lida && marcarLida.mutate(n.id)}
+                    className={cn(
+                      "w-full flex gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors",
+                      !n.lida && "bg-primary/[0.03]",
+                    )}
+                  >
+                    <div className="mt-0.5 w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <NotificacaoIcon tipo={n.tipo} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={cn(
+                            "text-sm truncate",
+                            n.lida ? "text-foreground/80 font-medium" : "text-foreground font-semibold",
+                          )}
+                        >
+                          {n.titulo}
+                        </p>
+                        {!n.lida && <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-snug">
+                        {n.mensagem}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground/70 mt-1">
+                        {formatRelativo(n.created_at)}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -131,17 +253,22 @@ export default function DashboardLayout({
   const userName = userNameProp ?? profile?.nome ?? "Usuário";
   const userRole = userRoleProp ?? (medico ? `CRM ${medico.crm}` : profile?.tipo === "paciente" ? "Paciente" : "");
 
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar items={navItems} />
+        <AppSidebar items={navItems} onLogout={handleLogout} />
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
           <header className="h-16 flex items-center justify-between px-4 lg:px-8 bg-card border-b border-border">
             <div className="flex items-center gap-1.5">
               <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors" />
-              <button 
+              <button
                 onClick={() => navigate(-1)}
                 className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200"
                 title="Voltar"
@@ -164,10 +291,7 @@ export default function DashboardLayout({
 
             {/* Right side */}
             <div className="flex items-center gap-4">
-              <button className="relative p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200">
-                <Bell className="h-[18px] w-[18px]" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />
-              </button>
+              <NotificacoesBell />
 
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
