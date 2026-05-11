@@ -110,3 +110,31 @@ export function useUpdatePrescricao() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["prescricoes"] }),
   });
 }
+
+export interface PrescricaoValidada {
+  id: string;
+  tipo_receita: Prescricao["tipo_receita"];
+  status: Prescricao["status"];
+  data_emissao: string;
+  medicamentos: MedicamentoItem[];
+  medico: {
+    nome: string;
+    crm: string;
+    especialidade: string;
+    clinica_nome: string | null;
+  };
+  paciente_primeiro_nome: string;
+}
+
+export function useValidarPrescricao(id: string | undefined) {
+  return useQuery({
+    queryKey: ["validar-prescricao", id],
+    enabled: !!id,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("validar_prescricao", { p_id: id });
+      if (error) throw error;
+      return (data ?? null) as PrescricaoValidada | null;
+    },
+  });
+}
