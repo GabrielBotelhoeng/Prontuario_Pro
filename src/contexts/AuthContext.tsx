@@ -23,6 +23,7 @@ interface AuthContextType {
   signUp: (data: SignUpData) => Promise<{ needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -116,48 +117,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signIn(tipo: "medico" | "paciente", documento: string, senha: string) {
-    const rpcName = tipo === "medico" ? "get_email_by_crm" : "get_email_by_cpf";
-    const paramName = tipo === "medico" ? "p_crm" : "p_cpf";
-
     const docOriginal = documento.trim();
-    // Versão só com dígitos/letras (sem pontuação de máscara)
     const docSemMascara = docOriginal.replace(/[.\-\s]/g, "");
 
-    // Tenta original, depois sem máscara
+    // login_lookup só retorna email quando a senha confere — fecha enumeration.
+    // Mesma resposta (NULL) para "identificador não existe" ou "senha errada".
     let email: string | null = null;
-    const { data: e1, error: err1 } = await supabase.rpc(rpcName, { [paramName]: docOriginal });
-    if (err1) console.error("[signIn] RPC erro (original):", err1);
+    const { data: e1 } = await supabase.rpc("login_lookup", {
+      p_identifier: docOriginal,
+      p_tipo: tipo,
+      p_password: senha,
+    });
     if (e1) {
       email = e1;
     } else if (docSemMascara !== docOriginal) {
-      const { data: e2, error: err2 } = await supabase.rpc(rpcName, { [paramName]: docSemMascara });
-      if (err2) console.error("[signIn] RPC erro (sem máscara):", err2);
+      const { data: e2 } = await supabase.rpc("login_lookup", {
+        p_identifier: docSemMascara,
+        p_tipo: tipo,
+        p_password: senha,
+      });
       if (e2) email = e2;
     }
 
     if (!email) {
-      throw new Error(
-        tipo === "medico"
-          ? "CRM não encontrado. Verifique o número cadastrado."
-          : "CPF não encontrado. Verifique o número cadastrado."
-      );
+      throw new Error("Credenciais inválidas. Verifique os dados e tente novamente.");
     }
 
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
     if (error) {
-      console.error("[signIn] signInWithPassword erro:", error.message, error);
       const msg = error.message.toLowerCase();
       if (msg.includes("email not confirmed") || msg.includes("not confirmed")) {
         throw new Error("Cadastro não confirmado. Verifique sua caixa de entrada e clique no link de ativação.");
       }
-      if (msg.includes("invalid login credentials") || msg.includes("invalid credentials")) {
-        throw new Error(
-          tipo === "medico"
-            ? "Senha incorreta. Verifique a senha cadastrada."
-            : "Senha incorreta. Verifique a senha cadastrada."
-        );
-      }
-      throw new Error("Erro ao fazer login: " + error.message);
+      throw new Error("Credenciais inválidas. Verifique os dados e tente novamente.");
     }
   }
 
@@ -233,8 +225,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message);
   }
 
+  async function refreshUserData() {
+    if (currentUserIdRef.current) {
+      await loadUserData(currentUserIdRef.current);
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, medico, paciente, loading, signIn, signUp, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, profile, medico, paciente, loading, signIn, signUp, signOut, resetPassword, refreshUserData }}>
       {children}
     </AuthContext.Provider>
   );
