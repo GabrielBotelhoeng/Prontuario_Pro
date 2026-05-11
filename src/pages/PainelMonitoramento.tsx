@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Home,
   FileText,
@@ -8,9 +8,7 @@ import {
   Sparkles,
   Eye,
   Download,
-  Send,
   Calendar as CalendarIcon,
-  TrendingUp,
   Users,
   Clock,
   Repeat,
@@ -20,14 +18,27 @@ import {
 } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { PieChart, Pie, Cell } from "recharts";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useEstatisticasMedico, useConsultasMedico } from "@/hooks/useConsultas";
+import { useToast } from "@/hooks/use-toast";
+import { toCsv, downloadCsv } from "@/lib/csv";
+import type { Consulta } from "@/lib/database.types";
+
+const PALETA = [
+  "hsl(var(--primary))",
+  "hsl(270 60% 70%)",
+  "hsl(270 40% 85%)",
+  "hsl(200 70% 65%)",
+  "hsl(40 80% 65%)",
+  "hsl(0 65% 70%)",
+];
 
 const navItems: NavItem[] = [
   { title: "Início", url: "/medico", icon: Home },
@@ -38,41 +49,12 @@ const navItems: NavItem[] = [
   { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
 ];
 
-const diagnosticData = [
-  { name: "Dengue", value: 62, color: "hsl(var(--primary))" },
-  { name: "COVID-19", value: 25, color: "hsl(270 60% 70%)" },
-  { name: "Hipertensão", value: 13, color: "hsl(270 40% 85%)" },
-];
-
-const chartConfig: ChartConfig = {
-  Dengue: { label: "Dengue", color: "hsl(var(--primary))" },
-  "COVID-19": { label: "COVID-19", color: "hsl(270 60% 70%)" },
-  Hipertensão: { label: "Hipertensão", color: "hsl(270 40% 85%)" },
-};
-
-const metrics = [
-  {
-    label: "Total de Atendimentos",
-    sublabel: "Este mês",
-    value: "248",
-    delta: "+12%",
-    icon: Users,
-  },
-  {
-    label: "Tempo Médio de Consulta",
-    sublabel: "Por atendimento",
-    value: "32 min",
-    delta: "-4 min",
-    icon: Clock,
-  },
-  {
-    label: "Taxa de Retorno",
-    sublabel: "Pacientes recorrentes",
-    value: "78%",
-    delta: "+5%",
-    icon: Repeat,
-  },
-];
+interface MetricItem {
+  label: string;
+  sublabel: string;
+  value: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
 
 interface ReportItem {
   id: string;
@@ -102,12 +84,104 @@ const reports: ReportItem[] = [
   },
 ];
 
+function getInterval(reportId: string, ref: Date): { start: Date; end: Date } {
+  if (reportId === "diario") return { start: startOfDay(ref), end: endOfDay(ref) };
+  if (reportId === "mensal") return { start: startOfMonth(ref), end: endOfMonth(ref) };
+  return { start: startOfYear(ref), end: endOfYear(ref) };
+}
+
 export default function PainelMonitoramento() {
   const [dates, setDates] = useState<Record<string, Date | undefined>>({
     diario: new Date(),
     mensal: new Date(),
     anual: new Date(),
   });
+  const [previewReport, setPreviewReport] = useState<ReportItem | null>(null);
+
+  const { toast } = useToast();
+  const { data: stats } = useEstatisticasMedico();
+  const { data: todasConsultas = [] } = useConsultasMedico();
+
+  const consultasFiltradas = useMemo(() => {
+    if (!previewReport) return [] as Consulta[];
+    const ref = dates[previewReport.id] ?? new Date();
+    const { start, end } = getInterval(previewReport.id, ref);
+    return todasConsultas.filter((c) =>
+      isWithinInterval(new Date(c.data_hora), { start, end }),
+    );
+  }, [previewReport, dates, todasConsultas]);
+
+  const handleDownload = (report: ReportItem) => {
+    const ref = dates[report.id] ?? new Date();
+    const { start, end } = getInterval(report.id, ref);
+    const linhas = todasConsultas.filter((c) =>
+      isWithinInterval(new Date(c.data_hora), { start, end }),
+    );
+
+    if (linhas.length === 0) {
+      toast({
+        title: "Sem dados no período",
+        description: "Não há consultas registradas para a data selecionada.",
+      });
+      return;
+    }
+
+    const rows = linhas.map((c) => ({
+      data: format(new Date(c.data_hora), "dd/MM/yyyy HH:mm"),
+      paciente: c.paciente?.profile?.nome ?? "",
+      tipo: c.tipo,
+      status: c.status,
+      observacoes: c.observacoes ?? "",
+    }));
+    const csv = toCsv(
+      ["Data/Hora", "Paciente", "Tipo", "Status", "Observações"],
+      rows,
+      ["data", "paciente", "tipo", "status", "observacoes"],
+    );
+    const dateLabel = format(ref, report.id === "anual" ? "yyyy" : report.id === "mensal" ? "MM-yyyy" : "dd-MM-yyyy");
+    downloadCsv(`relatorio-${report.id}-${dateLabel}.csv`, csv);
+    toast({
+      title: "Relatório baixado",
+      description: `${linhas.length} consulta(s) exportada(s) em CSV.`,
+    });
+  };
+
+  const metrics: MetricItem[] = useMemo(() => [
+    {
+      label: "Total de Atendimentos",
+      sublabel: "Este mês",
+      value: String(stats?.totalConsultasMes ?? 0),
+      icon: Users,
+    },
+    {
+      label: "Finalizadas Hoje",
+      sublabel: "Atendimentos concluídos",
+      value: String(stats?.finalizadasHoje ?? 0),
+      icon: Clock,
+    },
+    {
+      label: "Pacientes Únicos",
+      sublabel: "Atendidos no mês",
+      value: String(stats?.pacientesUnicos ?? 0),
+      icon: Repeat,
+    },
+  ], [stats]);
+
+  const diagnosticData = useMemo(
+    () => (stats?.distribuicaoPatologias ?? []).map((d, i) => ({
+      name: d.nome,
+      value: d.percentual,
+      qtd: d.qtd,
+      color: PALETA[i % PALETA.length],
+    })),
+    [stats],
+  );
+
+  const chartConfig: ChartConfig = useMemo(() => {
+    const cfg: ChartConfig = {};
+    diagnosticData.forEach((d) => { cfg[d.name] = { label: d.name, color: d.color }; });
+    return cfg;
+  }, [diagnosticData]);
 
   return (
     <DashboardLayout navItems={navItems} userName="Dr. Carlos" userRole="Médico">
@@ -144,10 +218,6 @@ export default function PainelMonitoramento() {
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                     <m.icon className="h-[18px] w-[18px] text-primary" />
                   </div>
-                  <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3" />
-                    {m.delta}
-                  </span>
                 </div>
               </div>
             </Card>
@@ -164,7 +234,7 @@ export default function PainelMonitoramento() {
                   Análise de Diagnósticos
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Distribuição de patologias — Setembro
+                  Distribuição de patologias — Mês atual
                 </p>
               </div>
               <span className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">
@@ -172,60 +242,47 @@ export default function PainelMonitoramento() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-              <div className="h-[240px] w-full">
-                <ChartContainer config={chartConfig} className="h-full w-full aspect-auto">
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Pie
-                      data={diagnosticData}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={55}
-                      outerRadius={95}
-                      paddingAngle={3}
-                      strokeWidth={0}
-                    >
-                      {diagnosticData.map((entry) => (
-                        <Cell key={entry.name} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ChartContainer>
+            {diagnosticData.length === 0 ? (
+              <div className="h-[240px] flex items-center justify-center border border-dashed border-border rounded-xl">
+                <p className="text-sm text-muted-foreground">Sem dados suficientes ainda</p>
               </div>
-
-              <div className="space-y-3">
-                {diagnosticData.map((d) => (
-                  <div key={d.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className="w-3 h-3 rounded-sm"
-                        style={{ backgroundColor: d.color }}
-                      />
-                      <span className="text-sm font-medium text-foreground">{d.name}</span>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                <div className="h-[240px] w-full">
+                  <ChartContainer config={chartConfig} className="h-full w-full aspect-auto">
+                    <PieChart>
+                      <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                      <Pie data={diagnosticData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={95} paddingAngle={3} strokeWidth={0}>
+                        {diagnosticData.map((entry) => (<Cell key={entry.name} fill={entry.color} />))}
+                      </Pie>
+                    </PieChart>
+                  </ChartContainer>
+                </div>
+                <div className="space-y-3">
+                  {diagnosticData.map((d) => (
+                    <div key={d.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: d.color }} />
+                        <span className="text-sm font-medium text-foreground">{d.name}</span>
+                      </div>
+                      <span className="text-sm font-bold text-foreground tabular-nums">{d.value}%</span>
                     </div>
-                    <span className="text-sm font-bold text-foreground tabular-nums">
-                      {d.value}%
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* AI Insight */}
             <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-primary/8 to-primary/4 border border-primary/15">
               <div className="flex gap-3">
                 <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
                   <Sparkles className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
-                    IA Insight
-                  </p>
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Resumo</p>
                   <p className="text-sm text-foreground/80 leading-relaxed">
-                    Observamos um aumento de <strong>15% nos casos de Dengue</strong> na sua
-                    região este mês. Sugerimos reforçar orientações de prevenção e controle
-                    vetorial junto aos pacientes.
+                    {stats && stats.totalConsultasMes > 0
+                      ? <>Você teve <strong>{stats.totalConsultasMes} consulta(s)</strong> no mês, atendendo <strong>{stats.pacientesUnicos} paciente(s) único(s)</strong>. Taxa de conclusão: <strong>{stats.taxaConclusao}%</strong>.</>
+                      : <>Sem consultas registradas neste mês ainda. Os dados aparecerão aqui conforme você atender pacientes.</>}
                   </p>
                 </div>
               </div>
@@ -290,39 +347,100 @@ export default function PainelMonitoramento() {
 
                     <button
                       title="Visualizar"
-                      onClick={() => { /* TODO: Implementar lógica no Cursor - Visualizar Relatório */ }}
+                      onClick={() => setPreviewReport(r)}
                       className="w-9 h-9 rounded-lg border border-border/70 bg-background/70 text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 flex items-center justify-center"
                     >
                       <Eye className="h-4 w-4" />
                     </button>
                     <button
-                      title="Download PDF"
-                      onClick={() => { /* TODO: Implementar lógica no Cursor - Baixar PDF do Relatório */ }}
+                      title="Baixar CSV"
+                      onClick={() => handleDownload(r)}
                       className="w-9 h-9 rounded-lg border border-border/70 bg-background/70 text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 flex items-center justify-center"
                     >
                       <Download className="h-4 w-4" />
                     </button>
-                    <button
-                      title="Enviar por e-mail"
-                      onClick={() => { /* TODO: Implementar lógica no Cursor - Enviar Relatório por E-mail */ }}
-                      className="w-9 h-9 rounded-lg border border-border/70 bg-background/70 text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 flex items-center justify-center"
-                    >
-                      <Send className="h-4 w-4" />
-                    </button>
                   </div>
-
-                  <Button
-                    onClick={() => { /* TODO: Implementar lógica no Cursor - Gerar Relatório Selecionado */ }}
-                    className="w-full mt-3 h-9 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-sm"
-                  >
-                    Gerar Relatório
-                  </Button>
                 </div>
               ))}
             </div>
           </Card>
         </div>
       </div>
+
+      <Dialog open={!!previewReport} onOpenChange={(open) => !open && setPreviewReport(null)}>
+        <DialogContent className="max-w-3xl rounded-2xl">
+          {previewReport && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold text-foreground tracking-tight">
+                  {previewReport.title}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  {previewReport.description} ·{" "}
+                  {format(
+                    dates[previewReport.id] ?? new Date(),
+                    previewReport.id === "anual"
+                      ? "yyyy"
+                      : previewReport.id === "mensal"
+                        ? "MMMM 'de' yyyy"
+                        : "dd 'de' MMMM 'de' yyyy",
+                    { locale: ptBR },
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex items-center justify-between gap-3 py-2 border-y border-border/40">
+                <div className="text-sm">
+                  <span className="font-bold text-foreground tabular-nums">{consultasFiltradas.length}</span>
+                  <span className="text-muted-foreground"> consulta(s) no período</span>
+                </div>
+                <button
+                  onClick={() => handleDownload(previewReport)}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-primary/30 text-primary hover:bg-primary/10 text-xs font-semibold transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Baixar CSV
+                </button>
+              </div>
+
+              <div className="max-h-[55vh] overflow-y-auto">
+                {consultasFiltradas.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-10">
+                    Nenhuma consulta registrada para o período selecionado.
+                  </p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border/40">
+                      <tr>
+                        <th className="text-left py-2 font-semibold">Data/Hora</th>
+                        <th className="text-left py-2 font-semibold">Paciente</th>
+                        <th className="text-left py-2 font-semibold">Tipo</th>
+                        <th className="text-left py-2 font-semibold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {consultasFiltradas.map((c) => (
+                        <tr key={c.id} className="border-b border-border/30 last:border-0">
+                          <td className="py-2.5 tabular-nums text-foreground">
+                            {format(new Date(c.data_hora), "dd/MM/yyyy HH:mm")}
+                          </td>
+                          <td className="py-2.5 text-foreground">{c.paciente?.profile?.nome ?? "—"}</td>
+                          <td className="py-2.5 text-muted-foreground">{c.tipo}</td>
+                          <td className="py-2.5">
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted/60 border border-border/40 text-foreground/80">
+                              {c.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
