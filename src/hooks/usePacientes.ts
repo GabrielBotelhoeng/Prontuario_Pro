@@ -76,7 +76,11 @@ export function useVincularPaciente() {
       const row = Array.isArray(data) ? data[0] : data;
       return row as { id: string; cpf: string; nome: string; email: string; medico_principal_id: string };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["pacientes"] }),
+    // Aguarda o refetch da lista antes de resolver — assim o Select já consegue
+    // exibir o paciente recém-vinculado quando o componente fizer setPacienteId(p.id).
+    onSuccess: async () => {
+      await qc.refetchQueries({ queryKey: ["pacientes"] });
+    },
   });
 }
 

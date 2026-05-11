@@ -2,13 +2,21 @@ import { useMemo, useState } from "react";
 import {
   Home, FileText, ClipboardList, CalendarDays, BarChart3,
   ChevronLeft, ChevronRight, Sparkles, Clock, Stethoscope,
-  X, PlayCircle,
+  X, PlayCircle, Plus,
 } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { cn } from "@/lib/utils";
-import { useConsultasMedico, useUpdateConsultaStatus } from "@/hooks/useConsultas";
+import { useConsultasMedico, useUpdateConsultaStatus, useCreateConsulta } from "@/hooks/useConsultas";
+import { usePacientesDoMedico } from "@/hooks/usePacientes";
 import { format } from "date-fns";
 import type { Consulta } from "@/lib/database.types";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const navItems: NavItem[] = [
   { title: "Início", url: "/medico", icon: Home },
@@ -33,13 +41,66 @@ const statusStyles: Record<Status, string> = {
   Cancelado: "bg-red-50 text-red-600 border-red-200",
 };
 
+const TIPOS_CONSULTA = ["Consulta de Rotina", "Retorno", "Urgência", "Telemedicina"] as const;
+
+function defaultDataHoraLocal(dia: number, year: number, month: number) {
+  const d = new Date(year, month, dia, 9, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function Agenda() {
   const today = new Date();
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState(today.getDate());
   const [viewMode, setViewMode] = useState<ViewMode>("Dia");
   const { data: consultas = [], isLoading } = useConsultasMedico();
+  const { data: pacientes = [] } = usePacientesDoMedico();
   const updateStatus = useUpdateConsultaStatus();
+  const createConsulta = useCreateConsulta();
+  const { toast } = useToast();
+
+  const [novaOpen, setNovaOpen] = useState(false);
+  const [novaPacienteId, setNovaPacienteId] = useState("");
+  const [novaDataHora, setNovaDataHora] = useState("");
+  const [novaTipo, setNovaTipo] = useState<string>(TIPOS_CONSULTA[0]);
+  const [novaObs, setNovaObs] = useState("");
+
+  function abrirNovaConsulta() {
+    setNovaPacienteId("");
+    setNovaDataHora(defaultDataHoraLocal(selectedDay, viewDate.getFullYear(), viewDate.getMonth()));
+    setNovaTipo(TIPOS_CONSULTA[0]);
+    setNovaObs("");
+    setNovaOpen(true);
+  }
+
+  async function handleCriarConsulta() {
+    if (!novaPacienteId) {
+      toast({ title: "Selecione um paciente", variant: "destructive" });
+      return;
+    }
+    if (!novaDataHora) {
+      toast({ title: "Informe data e hora", variant: "destructive" });
+      return;
+    }
+    try {
+      const iso = new Date(novaDataHora).toISOString();
+      await createConsulta.mutateAsync({
+        paciente_id: novaPacienteId,
+        data_hora: iso,
+        tipo: novaTipo,
+        observacoes: novaObs.trim() || undefined,
+        status: "Confirmado",
+      });
+      toast({ title: "Consulta agendada com sucesso" });
+      const d = new Date(novaDataHora);
+      setViewDate(new Date(d.getFullYear(), d.getMonth(), 1));
+      setSelectedDay(d.getDate());
+      setNovaOpen(false);
+    } catch (err: unknown) {
+      toast({ title: "Erro ao agendar", description: (err as Error).message, variant: "destructive" });
+    }
+  }
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -79,12 +140,18 @@ export default function Agenda() {
             <h1 className="text-2xl lg:text-[28px] font-bold text-foreground tracking-tight">Agenda de Atendimentos</h1>
             <p className="text-sm text-muted-foreground mt-1">Gerencie suas consultas com inteligência e fluidez</p>
           </div>
-          <div className="inline-flex items-center bg-card border border-border/60 rounded-xl p-1 shadow-sm">
-            {(["Dia","Semana","Mês"] as ViewMode[]).map((mode) => (
-              <button key={mode} onClick={() => setViewMode(mode)} className={cn("px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-200", viewMode === mode ? "bg-primary text-primary-foreground shadow-[0_2px_8px_-2px_hsl(var(--primary)/0.4)]" : "text-muted-foreground hover:text-foreground")}>
-                {mode}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex items-center bg-card border border-border/60 rounded-xl p-1 shadow-sm">
+              {(["Dia","Semana","Mês"] as ViewMode[]).map((mode) => (
+                <button key={mode} onClick={() => setViewMode(mode)} className={cn("px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-200", viewMode === mode ? "bg-primary text-primary-foreground shadow-[0_2px_8px_-2px_hsl(var(--primary)/0.4)]" : "text-muted-foreground hover:text-foreground")}>
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <Button onClick={abrirNovaConsulta} className="rounded-xl gap-2 shadow-sm">
+              <Plus className="h-4 w-4" />
+              Nova Consulta
+            </Button>
           </div>
         </div>
 
@@ -192,6 +259,76 @@ export default function Agenda() {
           </div>
         </div>
       </div>
+
+      <Dialog open={novaOpen} onOpenChange={setNovaOpen}>
+        <DialogContent className="sm:max-w-[480px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Nova Consulta</DialogTitle>
+            <DialogDescription>Agende um novo atendimento para um paciente da sua lista.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Paciente</Label>
+              <Select value={novaPacienteId} onValueChange={setNovaPacienteId}>
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue placeholder="Selecionar paciente..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {pacientes.length === 0 && <SelectItem value="_none" disabled>Nenhum paciente vinculado</SelectItem>}
+                  {pacientes.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nome} — CPF {p.cpf}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data e Hora</Label>
+              <Input
+                type="datetime-local"
+                value={novaDataHora}
+                onChange={(e) => setNovaDataHora(e.target.value)}
+                className="h-10 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tipo</Label>
+              <Select value={novaTipo} onValueChange={setNovaTipo}>
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {TIPOS_CONSULTA.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Observações <span className="normal-case text-muted-foreground/70">(opcional)</span></Label>
+              <Textarea
+                value={novaObs}
+                onChange={(e) => setNovaObs(e.target.value)}
+                placeholder="Informações adicionais para o atendimento..."
+                className="min-h-[80px] rounded-xl resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setNovaOpen(false)} className="rounded-xl">
+              Cancelar
+            </Button>
+            <Button onClick={handleCriarConsulta} disabled={createConsulta.isPending} className="rounded-xl gap-2">
+              {createConsulta.isPending && <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />}
+              {createConsulta.isPending ? "Agendando..." : "Agendar Consulta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
