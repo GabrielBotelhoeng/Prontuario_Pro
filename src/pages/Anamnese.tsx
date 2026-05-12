@@ -1,9 +1,10 @@
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSalvarAnamnese } from "@/hooks/useAnamneses";
 import { usePacientesDoMedico, useVincularPaciente } from "@/hooks/usePacientes";
 import { useDocumentosPacienteMedico, useUploadDocumento, useDeleteDocumento, downloadDocumento, validarArquivo } from "@/hooks/useDocumentos";
+import { logAuditEvent } from "@/hooks/useAuditLogs";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -79,6 +80,22 @@ export default function Anamnese() {
 
   const [pacienteId, setPacienteId] = useState("");
   const [cpfVincular, setCpfVincular] = useState("");
+
+  // Registra prontuario_visualizado uma vez por seleção de paciente.
+  // Mudanças de re-render não disparam novo log (ref persiste); apenas
+  // trocar para outro paciente registra novo evento.
+  const ultimoVisualizadoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (pacienteId && ultimoVisualizadoRef.current !== pacienteId) {
+      ultimoVisualizadoRef.current = pacienteId;
+      logAuditEvent({
+        action: "prontuario_visualizado",
+        resourceType: "paciente",
+        resourceId: pacienteId,
+        targetUserId: pacienteId,
+      });
+    }
+  }, [pacienteId]);
 
   async function handleVincular() {
     if (!cpfVincular.trim()) {

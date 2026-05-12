@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { Documento } from "@/lib/database.types";
 import { useAuth } from "@/contexts/AuthContext";
+import { logAuditEvent } from "@/hooks/useAuditLogs";
 
 const TIPOS_ACEITOS = ["pdf", "jpg", "jpeg", "png"] as const;
 const TAMANHO_MAXIMO = 20 * 1024 * 1024; // 20 MB
@@ -93,10 +94,21 @@ export function useUploadDocumento() {
 
       return data as Documento;
     },
-    onSuccess: (_data, { pacienteId }) => {
+    onSuccess: (data, { pacienteId }) => {
       qc.invalidateQueries({ queryKey: ["documentos", "paciente", pacienteId] });
       qc.invalidateQueries({ queryKey: ["documentos", "medico"] });
       qc.invalidateQueries({ queryKey: ["documentos", "paciente", user?.id] });
+      logAuditEvent({
+        action: "documento_enviado",
+        resourceType: "documento",
+        resourceId: data.id,
+        targetUserId: pacienteId,
+        metadata: {
+          nome: data.nome,
+          tipo_arquivo: data.tipo_arquivo,
+          tamanho_bytes: data.tamanho_bytes,
+        },
+      });
     },
   });
 }
@@ -127,5 +139,14 @@ export async function downloadDocumento(doc: Documento): Promise<void> {
     .from("documentos")
     .createSignedUrl(doc.storage_path, 3600);
   if (error) throw error;
+  // Audit antes de abrir — se a aba abrir e a sessão for redirecionada,
+  // o log já está persistido.
+  logAuditEvent({
+    action: "documento_baixado",
+    resourceType: "documento",
+    resourceId: doc.id,
+    targetUserId: doc.paciente_id,
+    metadata: { nome: doc.nome, tipo_arquivo: doc.tipo_arquivo },
+  });
   window.open(data.signedUrl, "_blank");
 }
