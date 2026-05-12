@@ -129,7 +129,8 @@ export type AuditAction =
   | "consentimento_aceito"
   | "consentimento_revogado"
   | "login_sucesso"
-  | "login_falha";
+  | "login_falha"
+  | "conta_encerrada";
 
 export interface AuditLog {
   id: string;
@@ -183,4 +184,19 @@ export interface ConsentimentoRow {
   aceito: boolean;
   criado_em: string;
   revogado_em: string | null;
+}
+
+export type SolicitacaoEncerramentoStatus =
+  | "pendente"
+  | "processando"
+  | "concluido"
+  | "cancelado";
+
+/** Linha retornada pela RPC minha_solicitacao_encerramento (LGPD art. 18 VI). */
+export interface SolicitacaoEncerramento {
+  id: string;
+  motivo: string | null;
+  status: SolicitacaoEncerramentoStatus;
+  criado_em: string;
+  processado_em: string | null;
 }

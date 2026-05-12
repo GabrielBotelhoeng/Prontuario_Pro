@@ -1,16 +1,35 @@
-import { Home, FileText, FolderHeart, CalendarDays, ShieldCheck, History, FileCheck2, FileX2 } from "lucide-react";
+import { useState } from "react";
+import { Home, FileText, FolderHeart, CalendarDays, ShieldCheck, History, FileCheck2, FileX2, AlertTriangle } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   useMeusConsentimentos,
   useRegistrarConsentimento,
   TERMOS_VERSAO,
 } from "@/hooks/useConsentimentos";
+import {
+  useMinhaSolicitacaoEncerramento,
+  useSolicitarEncerramento,
+} from "@/hooks/useEncerramentoConta";
+import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { ConsentimentoTipo } from "@/lib/database.types";
+
+const CONFIRMACAO_ENCERRAMENTO = "ENCERRAR";
 
 const navItems: NavItem[] = [
   { title: "Início", url: "/paciente", icon: Home },
@@ -79,9 +98,41 @@ const TERMOS: TermoConfig[] = [
 export default function Privacidade() {
   const { data: consentimentos = [], isLoading } = useMeusConsentimentos();
   const registrar = useRegistrarConsentimento();
+  const { data: solicitacao } = useMinhaSolicitacaoEncerramento();
+  const solicitar = useSolicitarEncerramento();
+  const { signOut } = useAuth();
   const { toast } = useToast();
 
+  const [encerrarOpen, setEncerrarOpen] = useState(false);
+  const [motivoEncerrar, setMotivoEncerrar] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+
   const indice = new Map(consentimentos.map((c) => [c.tipo, c]));
+  const temPedidoPendente = solicitacao?.status === "pendente";
+
+  const handleEncerrar = async () => {
+    if (confirmText.trim() !== CONFIRMACAO_ENCERRAMENTO) return;
+    try {
+      await solicitar.mutateAsync(motivoEncerrar.trim() || null);
+      toast({
+        title: "Solicitação registrada",
+        description:
+          "Seu pedido de encerramento foi enviado. Você será desconectado agora.",
+      });
+      setEncerrarOpen(false);
+      // Aguarda um tick para o toast renderizar antes do signOut redirecionar.
+      setTimeout(() => {
+        signOut();
+      }, 800);
+    } catch (err) {
+      toast({
+        title: "Não foi possível encerrar",
+        description:
+          err instanceof Error ? err.message : "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleAlternar = async (tipo: ConsentimentoTipo, aceitar: boolean) => {
     try {
@@ -270,7 +321,145 @@ export default function Privacidade() {
             })}
           </ul>
         )}
+
+        {/* Encerramento de conta — LGPD art. 18 VI */}
+        <div
+          className="bg-card border border-destructive/30 rounded-2xl p-6 mt-8"
+          style={{ boxShadow: "0 1px 12px -4px rgba(220,38,38,0.08)" }}
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-11 h-11 rounded-xl bg-destructive/10 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-foreground font-semibold text-[15px] mb-1">
+                Encerrar minha conta
+              </h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Você pode solicitar o encerramento da sua conta a qualquer
+                momento (LGPD art. 18, inciso VI). O pedido é registrado e
+                processado pela equipe — dados clínicos com retenção legal
+                obrigatória (CFM 1.821/2007) podem permanecer anonimizados.
+              </p>
+
+              {temPedidoPendente ? (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-50 px-4 py-3">
+                  <p className="text-sm font-medium text-amber-800">
+                    Solicitação pendente
+                  </p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Pedido registrado em{" "}
+                    {format(
+                      new Date(solicitacao!.criado_em),
+                      "dd/MM/yyyy 'às' HH:mm",
+                      { locale: ptBR },
+                    )}
+                    . Aguardando processamento.
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    setMotivoEncerrar("");
+                    setConfirmText("");
+                    setEncerrarOpen(true);
+                  }}
+                  className="rounded-lg"
+                >
+                  Solicitar encerramento
+                </Button>
+              )}
+
+              {solicitacao && !temPedidoPendente && (
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Última solicitação ({solicitacao.status}) em{" "}
+                  {format(
+                    new Date(solicitacao.criado_em),
+                    "dd/MM/yyyy",
+                    { locale: ptBR },
+                  )}
+                  .
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
+
+      <Dialog open={encerrarOpen} onOpenChange={setEncerrarOpen}>
+        <DialogContent className="sm:max-w-[480px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Encerrar conta
+            </DialogTitle>
+            <DialogDescription>
+              Esta ação registrará formalmente seu pedido de encerramento e
+              fará logout imediato. Você não conseguirá acessar a conta após
+              confirmar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Motivo (opcional)
+              </Label>
+              <Textarea
+                placeholder="Por que está encerrando? Sua resposta nos ajuda a melhorar."
+                value={motivoEncerrar}
+                onChange={(e) => setMotivoEncerrar(e.target.value)}
+                className="min-h-[80px] rounded-xl resize-none"
+                maxLength={500}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Digite{" "}
+                <span className="text-destructive font-bold">
+                  {CONFIRMACAO_ENCERRAMENTO}
+                </span>{" "}
+                para confirmar
+              </Label>
+              <Input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder={CONFIRMACAO_ENCERRAMENTO}
+                className="h-10 rounded-xl"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setEncerrarOpen(false)}
+              disabled={solicitar.isPending}
+              className="rounded-xl"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleEncerrar}
+              disabled={
+                solicitar.isPending ||
+                confirmText.trim() !== CONFIRMACAO_ENCERRAMENTO
+              }
+              className="rounded-xl gap-2"
+            >
+              {solicitar.isPending && (
+                <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              )}
+              {solicitar.isPending ? "Enviando..." : "Confirmar encerramento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
