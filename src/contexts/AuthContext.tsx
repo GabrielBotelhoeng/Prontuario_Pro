@@ -1,7 +1,26 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import type { Profile, Medico, Paciente } from "@/lib/database.types";
+import type { Profile, Medico, Paciente, ConsentimentoTipo } from "@/lib/database.types";
+import { registrarConsentimentosLote } from "@/hooks/useConsentimentos";
+import { logAuditEvent } from "@/hooks/useAuditLogs";
+
+const PENDING_CONSENTS_KEY = "prontuario:pendingConsents";
+
+/** Drena consentimentos pendentes salvos pelo Cadastro durante e-mail-confirm. */
+async function drainPendingConsents() {
+  try {
+    const raw = localStorage.getItem(PENDING_CONSENTS_KEY);
+    if (!raw) return;
+    const itens = JSON.parse(raw) as { tipo: ConsentimentoTipo; aceito: boolean }[];
+    if (Array.isArray(itens) && itens.length > 0) {
+      await registrarConsentimentosLote(itens);
+    }
+    localStorage.removeItem(PENDING_CONSENTS_KEY);
+  } catch (err) {
+    console.warn("[auth] falha ao registrar consentimentos pendentes:", err);
+  }
+}
 
 interface SignUpData {
   nome: string;
@@ -91,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       else setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       const newUser = session?.user ?? null;
       const newId = newUser?.id ?? null;
@@ -107,6 +126,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       currentUserIdRef.current = newId;
       setUser(newUser);
       if (newUser) loadUserData(newUser.id);
+
+      // Eventos LGPD no momento do login efetivo (não em refresh).
+      if (event === "SIGNED_IN" && newUser) {
+        drainPendingConsents();
+        logAuditEvent({ action: "login_sucesso" });
+      }
     });
 
     return () => {

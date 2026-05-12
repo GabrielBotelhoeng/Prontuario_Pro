@@ -1,4 +1,4 @@
-import { Home, FileText, FolderHeart, CalendarDays, Stethoscope, Phone } from "lucide-react";
+import { Home, FileText, FolderHeart, CalendarDays, Stethoscope, Phone, ShieldCheck, History } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { useTodosMedicos } from "@/hooks/usePacientes";
 
@@ -7,6 +7,8 @@ const navItems: NavItem[] = [
   { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
   { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
   { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
+  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
+  { title: "Acessos", url: "/paciente/acessos", icon: History },
 ];
 
 const colors = [

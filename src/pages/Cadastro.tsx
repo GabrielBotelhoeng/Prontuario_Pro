@@ -16,6 +16,13 @@ import logoIcon from "@/assets/logo-icon.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { maskCPF, filterCRM } from "@/lib/masks";
 import { useTodosMedicos } from "@/hooks/usePacientes";
+import {
+  registrarConsentimentosLote,
+  CONSENTIMENTOS_OBRIGATORIOS,
+} from "@/hooks/useConsentimentos";
+
+/** Chave usada para diferir aceite de consentimentos até confirmação de e-mail. */
+const PENDING_CONSENTS_KEY = "prontuario:pendingConsents";
 
 type Profile = "paciente" | "medico";
 
@@ -73,9 +80,22 @@ const Cadastro = () => {
         tipo: profile,
         medico_principal_id: profile === "paciente" && medicoResponsavelId ? medicoResponsavelId : undefined,
       });
+
+      const consentItens = CONSENTIMENTOS_OBRIGATORIOS.map((tipo) => ({
+        tipo,
+        aceito: true,
+      }));
+
       if (needsConfirmation) {
+        // Sem sessão ainda → registra na primeira autenticação (AuthContext).
+        try {
+          localStorage.setItem(PENDING_CONSENTS_KEY, JSON.stringify(consentItens));
+        } catch {
+          // localStorage indisponível: usuário poderá aceitar em /paciente/privacidade.
+        }
         setEmailConfirmRequired(true);
       } else {
+        await registrarConsentimentosLote(consentItens);
         navigate(profile === "medico" ? "/medico" : "/paciente");
       }
     } catch (err: unknown) {

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { Anamnese } from "@/lib/database.types";
 import { useAuth } from "@/contexts/AuthContext";
+import { logAuditEvent } from "@/hooks/useAuditLogs";
 
 export function useAnamnesesMedico() {
   const { user } = useAuth();
@@ -66,6 +67,14 @@ export function useSalvarAnamnese() {
       if (error) throw error;
       return result as Anamnese;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["anamneses"] }),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["anamneses"] });
+      logAuditEvent({
+        action: "anamnese_criada",
+        resourceType: "anamnese",
+        resourceId: result.id,
+        targetUserId: result.paciente_id,
+      });
+    },
   });
 }

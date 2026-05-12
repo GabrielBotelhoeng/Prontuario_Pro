@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { Prescricao, MedicamentoItem } from "@/lib/database.types";
 import { useAuth } from "@/contexts/AuthContext";
+import { logAuditEvent } from "@/hooks/useAuditLogs";
 
 const PRESCRICOES_SELECT = `
   *,
@@ -93,7 +94,16 @@ export function useCreatePrescricao() {
       if (error) throw error;
       return result as Prescricao;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["prescricoes"] }),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["prescricoes"] });
+      logAuditEvent({
+        action: "prescricao_criada",
+        resourceType: "prescricao",
+        resourceId: result.id,
+        targetUserId: result.paciente_id,
+        metadata: { tipo_receita: result.tipo_receita, status: result.status },
+      });
+    },
   });
 }
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Home, FileText, FolderHeart, CalendarDays, ClipboardList, Activity, Stethoscope, Paperclip, Download, Trash2, Upload, Pencil, X as XIcon } from "lucide-react";
+import { Home, FileText, FolderHeart, CalendarDays, ClipboardList, Activity, Stethoscope, Paperclip, Download, Trash2, Upload, Pencil, X as XIcon, ShieldCheck, History } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { useAnamnesesPaciente } from "@/hooks/useAnamneses";
 import { usePrescricoesPaciente } from "@/hooks/usePrescricoes";
@@ -23,6 +23,8 @@ const navItems: NavItem[] = [
   { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
   { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
   { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
+  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
+  { title: "Acessos", url: "/paciente/acessos", icon: History },
 ];
 
 export default function MeuProntuario() {

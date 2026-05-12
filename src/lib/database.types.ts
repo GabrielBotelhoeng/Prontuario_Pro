@@ -112,3 +112,75 @@ export interface Documento {
   tamanho_bytes: number | null;
   created_at: string;
 }
+
+// ─────────────────────────────────────────────────────────────
+// LGPD — Auditoria e consentimentos (migrations 013/014)
+// ─────────────────────────────────────────────────────────────
+
+export type AuditAction =
+  | "prontuario_visualizado"
+  | "prescricao_criada"
+  | "prescricao_visualizada"
+  | "anamnese_criada"
+  | "anamnese_visualizada"
+  | "consulta_visualizada"
+  | "documento_baixado"
+  | "documento_enviado"
+  | "consentimento_aceito"
+  | "consentimento_revogado"
+  | "login_sucesso"
+  | "login_falha";
+
+export interface AuditLog {
+  id: string;
+  actor_id: string | null;
+  actor_tipo: "medico" | "paciente" | "system" | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  target_user_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+/** Linha retornada pela RPC meus_acessos — inclui nome do ator. */
+export interface AuditLogRow {
+  id: string;
+  actor_id: string | null;
+  actor_nome: string;
+  actor_tipo: "medico" | "paciente" | "system" | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export type ConsentimentoTipo =
+  | "termos_uso"
+  | "politica_privacidade"
+  | "tratamento_saude"
+  | "compartilhamento_medicos"
+  | "comunicacoes_marketing";
+
+export interface Consentimento {
+  id: string;
+  user_id: string;
+  tipo: ConsentimentoTipo | string;
+  versao_termo: string;
+  aceito: boolean;
+  ip_address: string | null;
+  user_agent: string | null;
+  criado_em: string;
+  revogado_em: string | null;
+}
+
+/** Linha retornada pela RPC meus_consentimentos (vigente por tipo). */
+export interface ConsentimentoRow {
+  id: string;
+  tipo: ConsentimentoTipo | string;
+  versao_termo: string;
+  aceito: boolean;
+  criado_em: string;
+  revogado_em: string | null;
+}

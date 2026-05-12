@@ -1,5 +1,5 @@
 import {
-  Home, FileText, FolderHeart, CalendarDays, CalendarClock, Pill, UserCheck, Clock, Heart,
+  Home, FileText, FolderHeart, CalendarDays, CalendarClock, Pill, UserCheck, Clock, Heart, ShieldCheck, History,
 } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,8 @@ const navItems: NavItem[] = [
   { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
   { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
   { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
+  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
+  { title: "Acessos", url: "/paciente/acessos", icon: History },
 ];
 
 export default function DashboardPaciente() {

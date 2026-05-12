@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, FileText, FolderHeart, CalendarDays, Pill, ChevronRight, ShieldCheck, Copy, Stethoscope } from "lucide-react";
+import { Home, FileText, FolderHeart, CalendarDays, Pill, ChevronRight, ShieldCheck, Copy, Stethoscope, History } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { usePrescricoesPaciente } from "@/hooks/usePrescricoes";
@@ -22,6 +22,8 @@ const navItems: NavItem[] = [
   { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
   { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
   { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
+  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
+  { title: "Acessos", url: "/paciente/acessos", icon: History },
 ];
 
 const tipoLabel: Record<string, string> = {

@@ -25,6 +25,8 @@ const MeuProntuario = lazy(() => import("./pages/MeuProntuario.tsx"));
 const AgendaPaciente = lazy(() => import("./pages/AgendaPaciente.tsx"));
 const ReceitasPaciente = lazy(() => import("./pages/ReceitasPaciente.tsx"));
 const Especialistas = lazy(() => import("./pages/Especialistas.tsx"));
+const MeusAcessos = lazy(() => import("./pages/MeusAcessos.tsx"));
+const Privacidade = lazy(() => import("./pages/Privacidade.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 const queryClient = new QueryClient();
@@ -60,6 +62,8 @@ const App = () => (
                 <Route path="/paciente/agendamento" element={<ProtectedRoute requiredTipo="paciente"><AgendaPaciente /></ProtectedRoute>} />
                 <Route path="/paciente/receitas" element={<ProtectedRoute requiredTipo="paciente"><ReceitasPaciente /></ProtectedRoute>} />
                 <Route path="/paciente/especialistas" element={<ProtectedRoute requiredTipo="paciente"><Especialistas /></ProtectedRoute>} />
+                <Route path="/paciente/acessos" element={<ProtectedRoute requiredTipo="paciente"><MeusAcessos /></ProtectedRoute>} />
+                <Route path="/paciente/privacidade" element={<ProtectedRoute requiredTipo="paciente"><Privacidade /></ProtectedRoute>} />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>
