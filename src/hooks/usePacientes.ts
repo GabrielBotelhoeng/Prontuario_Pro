@@ -96,7 +96,9 @@ export function usePacienteByConsultas() {
         .eq("medico_id", user!.id);
       if (error) throw error;
       const unique = new Map<string, Paciente>();
-      data?.forEach((c: { paciente?: Paciente & { profile: { nome: string; email: string; avatar_url: string | null } } }) => {
+      // O PostgREST tipa o embed como array, mas a FK paciente_id retorna um único registro.
+      const rows = (data ?? []) as unknown as { paciente?: Paciente & { profile: { nome: string; email: string; avatar_url: string | null } } }[];
+      rows.forEach((c) => {
         if (c.paciente) unique.set(c.paciente.id, c.paciente);
       });
       return Array.from(unique.values()) as (Paciente & { profile: { nome: string; email: string; avatar_url: string | null } })[];
