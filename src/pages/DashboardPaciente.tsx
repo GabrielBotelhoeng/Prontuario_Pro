@@ -2,6 +2,7 @@ import {
   Home, FileText, FolderHeart, CalendarDays, CalendarClock, Pill, UserCheck, Clock, Heart, ShieldCheck, History,
 } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import MedicoResponsavelBanner from "@/components/MedicoResponsavelBanner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConsultasPaciente, useProximaConsultaPaciente } from "@/hooks/useConsultas";
 import { usePrescricoesPaciente } from "@/hooks/usePrescricoes";
@@ -57,6 +58,8 @@ export default function DashboardPaciente() {
   return (
     <DashboardLayout navItems={navItems}>
       <div className="max-w-6xl mx-auto space-y-8">
+        <MedicoResponsavelBanner />
+
         {/* Hero */}
         <div className="bg-card border border-border/40 rounded-2xl overflow-hidden" style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)" }}>
           <div className="flex flex-col lg:flex-row">

@@ -101,6 +101,23 @@ export interface Notificacao {
   created_at: string;
 }
 
+export type DocumentoCategoria =
+  | "exame_laboratorial"
+  | "exame_imagem"
+  | "receita"
+  | "atestado"
+  | "laudo"
+  | "outro";
+
+export const DOCUMENTO_CATEGORIA_LABEL: Record<DocumentoCategoria, string> = {
+  exame_laboratorial: "Exame laboratorial",
+  exame_imagem: "Exame de imagem",
+  receita: "Receita",
+  atestado: "Atestado",
+  laudo: "Laudo",
+  outro: "Outro",
+};
+
 export interface Documento {
   id: string;
   paciente_id: string;
@@ -110,6 +127,8 @@ export interface Documento {
   storage_path: string;
   tipo_arquivo: "pdf" | "jpg" | "jpeg" | "png";
   tamanho_bytes: number | null;
+  categoria: DocumentoCategoria | null;
+  data_exame: string | null;
   created_at: string;
 }
 

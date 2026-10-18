@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Home, FileText, ClipboardList, CalendarDays, BarChart3,
   ChevronLeft, ChevronRight, Sparkles, Clock, Stethoscope,
-  X, PlayCircle, Plus,
+  X, PlayCircle, Plus, FolderOpen,
 } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ const navItems: NavItem[] = [
   { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
   { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
   { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
+  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
   { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
   { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
 ];
@@ -59,6 +61,28 @@ export default function Agenda() {
   const updateStatus = useUpdateConsultaStatus();
   const createConsulta = useCreateConsulta();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  async function handleIniciarAtendimento(apt: Consulta) {
+    try {
+      await updateStatus.mutateAsync({ id: apt.id, status: "Em andamento" });
+      navigate(
+        `/medico/anamnese?consultaId=${apt.id}&pacienteId=${apt.paciente_id}`,
+      );
+    } catch (err: unknown) {
+      toast({
+        title: "Erro ao iniciar atendimento",
+        description: (err as Error).message,
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleContinuarAtendimento(apt: Consulta) {
+    navigate(
+      `/medico/anamnese?consultaId=${apt.id}&pacienteId=${apt.paciente_id}`,
+    );
+  }
 
   const [novaOpen, setNovaOpen] = useState(false);
   const [novaPacienteId, setNovaPacienteId] = useState("");
@@ -232,8 +256,8 @@ export default function Agenda() {
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Stethoscope className="h-3 w-3" />{apt.tipo}</div>
                               {(apt.status === "Aguardando" || apt.status === "Confirmado") && (
                                 <div className="mt-3 flex items-center gap-2">
-                                  <button onClick={() => updateStatus.mutateAsync({ id: apt.id, status: "Em andamento" })} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all">
-                                    <PlayCircle className="h-3.5 w-3.5" />Iniciar
+                                  <button onClick={() => handleIniciarAtendimento(apt)} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all" title="Inicia o atendimento e abre o prontuário do paciente">
+                                    <PlayCircle className="h-3.5 w-3.5" />Iniciar Atendimento
                                   </button>
                                   <button onClick={() => updateStatus.mutateAsync({ id: apt.id, status: "Cancelado" })} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-all">
                                     <X className="h-3 w-3" />Cancelar
@@ -242,8 +266,11 @@ export default function Agenda() {
                               )}
                               {isCurrent && (
                                 <div className="mt-3 flex items-center gap-2">
+                                  <button onClick={() => handleContinuarAtendimento(apt)} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all">
+                                    <Stethoscope className="h-3.5 w-3.5" />Abrir Prontuário
+                                  </button>
                                   <button onClick={() => updateStatus.mutateAsync({ id: apt.id, status: "Finalizado" })} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-all">
-                                    Finalizar Atendimento
+                                    Finalizar
                                   </button>
                                 </div>
                               )}

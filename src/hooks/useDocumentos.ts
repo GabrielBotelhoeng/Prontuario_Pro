@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { Documento } from "@/lib/database.types";
+import type { Documento, DocumentoCategoria } from "@/lib/database.types";
 import { useAuth } from "@/contexts/AuthContext";
 import { logAuditEvent } from "@/hooks/useAuditLogs";
 
@@ -52,10 +52,50 @@ export function useDocumentosPacienteMedico(pacienteId: string) {
   });
 }
 
+/** Documento + identificação do paciente (para a visão cross-paciente do médico). */
+export interface DocumentoRecente extends Documento {
+  paciente: {
+    id: string;
+    cpf: string;
+    profile: { nome: string; avatar_url: string | null } | null;
+  } | null;
+}
+
+/**
+ * Lista uploads recentes feitos pelos PACIENTES do médico autenticado.
+ * - Inclui apenas documentos enviados pelo próprio paciente (uploaded_by = paciente_id),
+ *   excluindo uploads feitos pelo médico durante a consulta (reduz ruído).
+ * - RLS no Supabase já filtra para mostrar somente pacientes que o médico atende.
+ *
+ * Limite default: 60 itens, mais que suficiente para os últimos dias.
+ */
+export function useDocumentosRecentesMedico(limit = 60) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["documentos", "recentes-medico", user?.id, limit],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("documentos")
+        .select(
+          "*, paciente:pacientes!documentos_paciente_id_fkey(id, cpf, profile:profiles(nome, avatar_url))",
+        )
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      const rows = (data ?? []) as DocumentoRecente[];
+      // Filtra cliente-side: só uploads do próprio paciente (não do médico).
+      return rows.filter((d) => d.uploaded_by === d.paciente_id);
+    },
+  });
+}
+
 interface UploadDocumentoParams {
   pacienteId: string;
   arquivo: File;
   nome: string;
+  categoria?: DocumentoCategoria | null;
+  dataExame?: string | null;
   consultaId?: string;
 }
 
@@ -63,7 +103,7 @@ export function useUploadDocumento() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ pacienteId, arquivo, nome, consultaId }: UploadDocumentoParams) => {
+    mutationFn: async ({ pacienteId, arquivo, nome, categoria, dataExame, consultaId }: UploadDocumentoParams) => {
       const ext = arquivo.name.split(".").pop()!.toLowerCase();
       const uuid = crypto.randomUUID();
       const storagePath = `${pacienteId}/${uuid}.${ext}`;
@@ -83,6 +123,8 @@ export function useUploadDocumento() {
           storage_path: storagePath,
           tipo_arquivo: ext,
           tamanho_bytes: arquivo.size,
+          categoria: categoria ?? null,
+          data_exame: dataExame || null,
         })
         .select()
         .single();

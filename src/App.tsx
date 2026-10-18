@@ -21,6 +21,7 @@ const Anamnese = lazy(() => import("./pages/Anamnese.tsx"));
 const Agenda = lazy(() => import("./pages/Agenda.tsx"));
 const PainelMonitoramento = lazy(() => import("./pages/PainelMonitoramento.tsx"));
 const PainelIA = lazy(() => import("./pages/PainelIA.tsx"));
+const DocumentosPacientes = lazy(() => import("./pages/DocumentosPacientes.tsx"));
 const MeuProntuario = lazy(() => import("./pages/MeuProntuario.tsx"));
 const AgendaPaciente = lazy(() => import("./pages/AgendaPaciente.tsx"));
 const ReceitasPaciente = lazy(() => import("./pages/ReceitasPaciente.tsx"));
@@ -55,6 +56,7 @@ const App = () => (
                 <Route path="/medico/agenda" element={<ProtectedRoute requiredTipo="medico"><Agenda /></ProtectedRoute>} />
                 <Route path="/medico/monitoramento" element={<ProtectedRoute requiredTipo="medico"><PainelMonitoramento /></ProtectedRoute>} />
                 <Route path="/medico/painel-ia" element={<ProtectedRoute requiredTipo="medico"><PainelIA /></ProtectedRoute>} />
+                <Route path="/medico/documentos" element={<ProtectedRoute requiredTipo="medico"><DocumentosPacientes /></ProtectedRoute>} />
 
                 {/* Paciente */}
                 <Route path="/paciente" element={<ProtectedRoute requiredTipo="paciente"><DashboardPaciente /></ProtectedRoute>} />

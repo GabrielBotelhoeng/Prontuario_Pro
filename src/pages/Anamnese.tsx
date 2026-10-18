@@ -1,9 +1,14 @@
 import { useMemo, useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSalvarAnamnese } from "@/hooks/useAnamneses";
 import { usePacientesDoMedico, useVincularPaciente } from "@/hooks/usePacientes";
+import { useConsultasMedico } from "@/hooks/useConsultas";
 import { useDocumentosPacienteMedico, useUploadDocumento, useDeleteDocumento, downloadDocumento, validarArquivo } from "@/hooks/useDocumentos";
+import { DOCUMENTO_CATEGORIA_LABEL } from "@/lib/database.types";
+import { format as formatDate } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { logAuditEvent } from "@/hooks/useAuditLogs";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,6 +38,7 @@ import {
   Download,
   Trash2,
   Upload,
+  FolderOpen,
 } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { Input } from "@/components/ui/input";
@@ -48,6 +54,7 @@ const navItems: NavItem[] = [
   { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
   { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
   { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
+  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
   { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
   { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
 ];
@@ -74,12 +81,32 @@ interface Pathology {
 export default function Anamnese() {
   const { profile, user } = useAuth();
   const { data: pacientes = [] } = usePacientesDoMedico();
+  const { data: consultasMedico = [] } = useConsultasMedico();
   const vincularPaciente = useVincularPaciente();
   const salvarAnamnese = useSalvarAnamnese();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [pacienteId, setPacienteId] = useState("");
   const [cpfVincular, setCpfVincular] = useState("");
+
+  // H1 (visibilidade do status) + H6 (reconhecer vs lembrar):
+  // ao chegar via "Iniciar atendimento" da agenda, pré-seleciona o paciente
+  // e exibe banner contextualizando que há consulta em andamento.
+  const consultaIdParam = searchParams.get("consultaId");
+  const pacienteIdParam = searchParams.get("pacienteId");
+  const consultaAtual = useMemo(
+    () => consultasMedico.find((c) => c.id === consultaIdParam) ?? null,
+    [consultasMedico, consultaIdParam],
+  );
+
+  useEffect(() => {
+    if (pacienteIdParam && pacienteIdParam !== pacienteId) {
+      setPacienteId(pacienteIdParam);
+    }
+    // intencionalmente só observa o param; setPacienteId só roda na chegada
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pacienteIdParam]);
 
   // Registra prontuario_visualizado uma vez por seleção de paciente.
   // Mudanças de re-render não disparam novo log (ref persiste); apenas
@@ -98,17 +125,43 @@ export default function Anamnese() {
   }, [pacienteId]);
 
   async function handleVincular() {
-    if (!cpfVincular.trim()) {
-      toast({ title: "Informe um CPF", variant: "destructive" });
+    // H5 (prevenção de erros): aceita CPF com ou sem pontuação.
+    const cpfLimpo = cpfVincular.replace(/\D/g, "");
+    if (!cpfLimpo) {
+      toast({ title: "Informe um CPF", description: "Digite o CPF do paciente para localizá-lo.", variant: "destructive" });
+      return;
+    }
+    if (cpfLimpo.length !== 11) {
+      toast({
+        title: "CPF inválido",
+        description: `O CPF deve ter 11 dígitos — você digitou ${cpfLimpo.length}.`,
+        variant: "destructive",
+      });
       return;
     }
     try {
-      const p = await vincularPaciente.mutateAsync(cpfVincular);
-      toast({ title: "Paciente vinculado", description: `${p.nome} agora está na sua lista.` });
+      const p = await vincularPaciente.mutateAsync(cpfLimpo);
+      if (!p || !p.id) {
+        // H9 (recuperação de erros): mensagem clara em vez de toast genérico.
+        toast({
+          title: "Paciente não encontrado",
+          description: "Verifique o CPF — ainda não há um paciente cadastrado com esse número no sistema.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: `Paciente ${p.nome} vinculado`,
+        description: "Já está selecionado abaixo, com o prontuário disponível.",
+      });
       setCpfVincular("");
       setPacienteId(p.id);
     } catch (err: unknown) {
-      toast({ title: "Erro ao vincular", description: (err as Error).message, variant: "destructive" });
+      const msg = (err as Error).message ?? "";
+      const amigavel = /not found|0 rows|null value/i.test(msg)
+        ? "Nenhum paciente encontrado com esse CPF. Confirme o número com o paciente."
+        : msg;
+      toast({ title: "Não foi possível vincular", description: amigavel, variant: "destructive" });
     }
   }
 
@@ -221,6 +274,45 @@ export default function Anamnese() {
             </p>
           </div>
         </div>
+
+        {/* H1 — visibilidade do status. Quando o médico vem da agenda
+            clicando em "Iniciar Atendimento", contextualiza onde ele está. */}
+        {consultaAtual && (
+          <div
+            className="rounded-2xl border border-primary/30 px-5 py-4 flex items-center gap-3"
+            style={{
+              background:
+                "linear-gradient(90deg, hsl(var(--primary) / 0.08), hsl(var(--primary) / 0.02))",
+            }}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                Consulta em andamento
+              </p>
+              <p className="text-sm font-semibold text-foreground truncate">
+                {consultaAtual.paciente?.profile?.nome ?? "Paciente"}
+                <span className="text-muted-foreground font-normal">
+                  {" · "}
+                  {consultaAtual.tipo} · iniciada às{" "}
+                  {formatDate(new Date(consultaAtual.data_hora), "HH:mm", { locale: ptBR })}
+                </span>
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                searchParams.delete("consultaId");
+                searchParams.delete("pacienteId");
+                setSearchParams(searchParams);
+              }}
+              className="text-xs text-muted-foreground"
+            >
+              Sair desta consulta
+            </Button>
+          </div>
+        )}
 
         {/* Patient identification card */}
         <div
@@ -545,9 +637,17 @@ export default function Anamnese() {
                     <div className="flex items-center gap-3 min-w-0">
                       <Paperclip className="h-4 w-4 text-primary shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{doc.nome}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-foreground truncate">{doc.nome}</p>
+                          {doc.categoria && (
+                            <Badge variant="secondary" className="rounded-full text-[10px] px-2 py-0 h-5 bg-primary/10 text-primary hover:bg-primary/15">
+                              {DOCUMENTO_CATEGORIA_LABEL[doc.categoria]}
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-[11px] text-muted-foreground">
                           {doc.tipo_arquivo.toUpperCase()}
+                          {doc.data_exame ? ` · Exame de ${formatDate(new Date(doc.data_exame + "T00:00:00"), "dd/MM/yyyy")}` : ""}
                           {doc.tamanho_bytes ? ` · ${(doc.tamanho_bytes / 1024 / 1024).toFixed(1)} MB` : ""}
                         </p>
                       </div>

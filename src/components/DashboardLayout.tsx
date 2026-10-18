@@ -147,6 +147,34 @@ function NotificacoesBell() {
   const marcarLida = useMarcarNotificacaoLida();
   const marcarTodas = useMarcarTodasLidas();
   const naoLidas = notificacoes.filter((n) => !n.lida).length;
+  const navigate = useNavigate();
+  const { profile } = useAuth();
+
+  // H1 (visibilidade) + H7 (eficiência): ao clicar, leva ao destino certo
+  // baseado no tipo, papel do usuário e — quando aplicável — no título
+  // (ex.: alerta "Novo documento de paciente" vai pra /medico/documentos
+  // em vez do Painel de IA genérico).
+  function destinoNotificacao(n: Notificacao): string | null {
+    const isMedico = profile?.tipo === "medico";
+    switch (n.tipo) {
+      case "consulta":
+        return isMedico ? "/medico/agenda" : "/paciente/agendamento";
+      case "receita":
+        return isMedico ? "/medico/prescricao" : "/paciente/receitas";
+      case "alerta":
+        if (isMedico && /documento/i.test(n.titulo)) return "/medico/documentos";
+        return isMedico ? "/medico/painel-ia" : "/paciente/prontuario";
+      case "sistema":
+      default:
+        return null;
+    }
+  }
+
+  function handleClickNotificacao(n: Notificacao) {
+    if (!n.lida) marcarLida.mutate(n.id);
+    const destino = destinoNotificacao(n);
+    if (destino) navigate(destino);
+  }
 
   return (
     <Popover>
@@ -195,7 +223,7 @@ function NotificacoesBell() {
               {notificacoes.map((n) => (
                 <li key={n.id}>
                   <button
-                    onClick={() => !n.lida && marcarLida.mutate(n.id)}
+                    onClick={() => handleClickNotificacao(n)}
                     className={cn(
                       "w-full flex gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors",
                       !n.lida && "bg-primary/[0.03]",

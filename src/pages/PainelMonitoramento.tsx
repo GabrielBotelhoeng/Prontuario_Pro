@@ -15,6 +15,7 @@ import {
   FileBarChart,
   FileSpreadsheet,
   FileClock,
+  FolderOpen,
 } from "lucide-react";
 import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
 import { Card } from "@/components/ui/card";
@@ -45,6 +46,7 @@ const navItems: NavItem[] = [
   { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
   { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
   { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
+  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
   { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
   { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
 ];
