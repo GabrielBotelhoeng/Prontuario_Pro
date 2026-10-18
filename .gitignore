@@ -36,3 +36,5 @@ FASE2_PRONTUARIO.md
 # Planejamento e configurações locais
 .planning/
 .windsurf/rules
+.vercel
+.env*
