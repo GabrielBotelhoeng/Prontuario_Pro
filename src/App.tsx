@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,7 +12,9 @@ import PageLoader from "@/components/PageLoader";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const EsqueciSenha = lazy(() => import("./pages/EsqueciSenha.tsx"));
 const ResetSenha = lazy(() => import("./pages/ResetSenha.tsx"));
-const Cadastro = lazy(() => import("./pages/Cadastro.tsx"));
+const PrimeiroAcesso = lazy(() => import("./pages/PrimeiroAcesso.tsx"));
+const AdminUsuarios = lazy(() => import("./pages/admin/AdminUsuarios.tsx"));
+const AdminAuditoria = lazy(() => import("./pages/admin/AdminAuditoria.tsx"));
 const ValidarReceita = lazy(() => import("./pages/ValidarReceita.tsx"));
 const DashboardMedico = lazy(() => import("./pages/DashboardMedico.tsx"));
 const DashboardPaciente = lazy(() => import("./pages/DashboardPaciente.tsx"));
@@ -46,7 +48,9 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/esqueci-senha" element={<EsqueciSenha />} />
                 <Route path="/reset-senha" element={<ResetSenha />} />
-                <Route path="/cadastro" element={<Cadastro />} />
+                <Route path="/primeiro-acesso" element={<PrimeiroAcesso />} />
+                {/* Autocadastro desativado: contas são provisionadas pela administração */}
+                <Route path="/cadastro" element={<Navigate to="/" replace />} />
                 <Route path="/validar/:id" element={<ValidarReceita />} />
 
                 {/* Médico */}
@@ -57,6 +61,10 @@ const App = () => (
                 <Route path="/medico/monitoramento" element={<ProtectedRoute requiredTipo="medico"><PainelMonitoramento /></ProtectedRoute>} />
                 <Route path="/medico/painel-ia" element={<ProtectedRoute requiredTipo="medico"><PainelIA /></ProtectedRoute>} />
                 <Route path="/medico/documentos" element={<ProtectedRoute requiredTipo="medico"><DocumentosPacientes /></ProtectedRoute>} />
+
+                {/* Administração */}
+                <Route path="/admin" element={<ProtectedRoute requiredTipo="admin"><AdminUsuarios /></ProtectedRoute>} />
+                <Route path="/admin/auditoria" element={<ProtectedRoute requiredTipo="admin"><AdminAuditoria /></ProtectedRoute>} />
 
                 {/* Paciente */}
                 <Route path="/paciente" element={<ProtectedRoute requiredTipo="paciente"><DashboardPaciente /></ProtectedRoute>} />

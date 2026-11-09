@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { useValidarPrescricao } from "@/hooks/usePrescricoes";
-import logoIcon from "@/assets/logo-icon.png";
+import { BrandMark } from "@/components/Brand";
 
 const tipoLabel: Record<string, string> = {
   simples: "Receita Simples",
@@ -23,7 +23,7 @@ export default function ValidarReceita() {
       <header className="border-b border-border/40 bg-card/60 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 text-foreground hover:text-primary transition-colors">
-            <img src={logoIcon} alt="Prontuário Pro" className="h-8 w-8" />
+            <BrandMark className="h-8 w-8 text-primary" />
             <span className="font-bold tracking-tight">Prontuário Pro</span>
           </Link>
           <Link

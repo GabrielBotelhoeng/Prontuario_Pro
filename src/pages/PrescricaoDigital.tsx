@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCreatePrescricao } from "@/hooks/usePrescricoes";
 import { usePacientesDoMedico, useVincularPaciente } from "@/hooks/usePacientes";
 import { useToast } from "@/hooks/use-toast";
-import logoIcon from "@/assets/logo-icon.png";
+import { BrandMark } from "@/components/Brand";
 
 const navItems: NavItem[] = [
   { title: "Início", url: "/medico", icon: Home },
@@ -273,12 +273,12 @@ export default function PrescricaoDigital() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Pré-visualização em tempo real</p>
               <Badge variant="outline" className={cn("rounded-full text-[10px] border-current", accent.label)}>{tipoReceitaLabel[tipoReceita]}</Badge>
             </div>
-            <div className="bg-card border border-border/40 rounded-2xl min-h-[640px] flex flex-col overflow-hidden" style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)", backgroundImage: "linear-gradient(180deg, hsl(267 30% 99%) 0%, hsl(0 0% 100%) 100%)" }}>
+            <div className="bg-card border border-border/40 rounded-2xl min-h-[640px] flex flex-col overflow-hidden" style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)", backgroundImage: "linear-gradient(180deg, hsl(var(--background)) 0%, hsl(0 0% 100%) 100%)" }}>
               <div className="h-1.5 w-full" style={{ background: accent.stripe }} />
               <div className="p-8 lg:p-10 flex flex-col flex-1">
                 <div className="flex items-start justify-between pb-5 border-b border-border/50">
                   <div className="flex items-center gap-3">
-                    <img src={logoIcon} alt="" className="w-11 h-11" />
+                    <BrandMark className="h-10 w-10 text-primary" />
                     <div>
                       <p className="text-base font-bold text-foreground tracking-tight">{medico?.clinica_nome ?? "Consultório"}</p>
                       <p className="text-[11px] text-muted-foreground">{medico?.clinica_endereco ?? "Endereço do consultório"}</p>

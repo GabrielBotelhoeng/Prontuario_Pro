@@ -8,7 +8,7 @@ import { useConsultasPaciente, useProximaConsultaPaciente } from "@/hooks/useCon
 import { usePrescricoesPaciente } from "@/hooks/usePrescricoes";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import clinicImg from "@/assets/clinic-reception.jpg";
+import salaEsperaImg from "@/assets/sala-espera.webp";
 
 const navItems: NavItem[] = [
   { title: "Início", url: "/paciente", icon: Home },
@@ -53,7 +53,7 @@ export default function DashboardPaciente() {
       .map((c) => [c.medico_id, c.medico])
   ).values()].slice(0, 4);
 
-  const colors = ["bg-primary/15 text-primary", "bg-emerald-500/15 text-emerald-600", "bg-violet-500/15 text-violet-600", "bg-amber-500/15 text-amber-600"];
+  const colors = ["bg-primary/15 text-primary", "bg-emerald-500/15 text-emerald-600", "bg-sky-500/15 text-sky-700", "bg-amber-500/15 text-amber-600"];
 
   return (
     <DashboardLayout navItems={navItems}>
@@ -61,17 +61,19 @@ export default function DashboardPaciente() {
         <MedicoResponsavelBanner />
 
         {/* Hero */}
-        <div className="bg-card border border-border/40 rounded-2xl overflow-hidden" style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)" }}>
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex flex-col lg:flex-row">
             <div className="flex-1 p-8 lg:p-10 flex flex-col justify-center">
-              <p className="text-primary text-sm font-semibold tracking-wide uppercase mb-2">Olá, {primeiroNome}</p>
-              <h1 className="text-foreground text-2xl lg:text-3xl font-bold tracking-tight mb-4">Seu painel de saúde</h1>
+              <p className="eyebrow mb-4">Seu painel de saúde</p>
+              <h1 className="font-display text-4xl lg:text-5xl leading-[1.02] text-foreground mb-4">
+                Olá, <em>{primeiroNome}</em>.
+              </h1>
               <p className="text-muted-foreground text-[15px] leading-relaxed max-w-lg">
-                Acompanhe suas consultas, receitas e prontuário médico em um só lugar. Seu bem-estar é a nossa prioridade.
+                Consultas, receitas e seu histórico no hospital, reunidos em um só lugar.
               </p>
             </div>
             <div className="lg:w-[380px] xl:w-[440px] h-56 lg:h-auto flex-shrink-0">
-              <img src={clinicImg} alt="Consultório" className="w-full h-full object-cover" loading="lazy" width={1280} height={720} />
+              <img src={salaEsperaImg} alt="" className="w-full h-full object-cover" loading="lazy" width={1200} height={900} />
             </div>
           </div>
         </div>

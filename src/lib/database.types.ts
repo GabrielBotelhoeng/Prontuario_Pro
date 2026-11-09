@@ -2,8 +2,10 @@ export interface Profile {
   id: string;
   nome: string;
   email: string;
-  tipo: "medico" | "paciente";
+  tipo: "medico" | "paciente" | "admin";
   avatar_url: string | null;
+  ativo: boolean;
+  precisa_trocar_senha: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -154,7 +156,7 @@ export type AuditAction =
 export interface AuditLog {
   id: string;
   actor_id: string | null;
-  actor_tipo: "medico" | "paciente" | "system" | null;
+  actor_tipo: "medico" | "paciente" | "admin" | "system" | null;
   action: string;
   resource_type: string | null;
   resource_id: string | null;
@@ -168,7 +170,7 @@ export interface AuditLogRow {
   id: string;
   actor_id: string | null;
   actor_nome: string;
-  actor_tipo: "medico" | "paciente" | "system" | null;
+  actor_tipo: "medico" | "paciente" | "admin" | "system" | null;
   action: string;
   resource_type: string | null;
   resource_id: string | null;

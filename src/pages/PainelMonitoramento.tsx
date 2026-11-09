@@ -34,11 +34,11 @@ import type { Consulta } from "@/lib/database.types";
 
 const PALETA = [
   "hsl(var(--primary))",
-  "hsl(270 60% 70%)",
-  "hsl(270 40% 85%)",
-  "hsl(200 70% 65%)",
-  "hsl(40 80% 65%)",
-  "hsl(0 65% 70%)",
+  "hsl(var(--brass))",
+  "hsl(186 35% 55%)",
+  "hsl(195 14% 68%)",
+  "hsl(var(--warning))",
+  "hsl(var(--destructive))",
 ];
 
 const navItems: NavItem[] = [

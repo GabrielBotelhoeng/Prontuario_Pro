@@ -14,7 +14,18 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['"Geist"', "system-ui", "sans-serif"],
+        mono: ['"Geist Mono"', "ui-monospace", "monospace"],
+        display: ['"Instrument Serif"', "Georgia", "serif"],
+      },
       colors: {
+        brass: {
+          DEFAULT: "hsl(var(--brass))",
+          foreground: "hsl(var(--brass-foreground))",
+        },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

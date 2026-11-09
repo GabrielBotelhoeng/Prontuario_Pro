@@ -14,7 +14,7 @@ const navItems: NavItem[] = [
 const colors = [
   "bg-primary/15 text-primary",
   "bg-emerald-500/15 text-emerald-600",
-  "bg-violet-500/15 text-violet-600",
+  "bg-sky-500/15 text-sky-700",
   "bg-amber-500/15 text-amber-600",
   "bg-rose-500/15 text-rose-600",
   "bg-cyan-500/15 text-cyan-600",

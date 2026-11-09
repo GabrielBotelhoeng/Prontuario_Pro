@@ -1,82 +1,82 @@
-import { ReactNode } from "react";
-import doctorHero from "@/assets/doctor-hero.jpg";
+import { ReactNode, useEffect, useState } from "react";
+import { ShieldCheck } from "lucide-react";
+import corridor from "@/assets/hospital-corridor.webp";
+import { BrandLockup, BrandMark } from "@/components/Brand";
 
 interface AuthLayoutProps {
   children: ReactNode;
-  /** When true, hides the left marketing column (used on narrower forms like signup if desired) */
-  marketing?: { title: ReactNode; subtitle: string };
+  /** Texto editorial sobre a fotografia (desktop). Use <em> para a ênfase em itálico. */
+  aside?: { title: ReactNode; caption: string };
 }
 
-const AuthLayout = ({ children, marketing }: AuthLayoutProps) => {
+const AMBIENT_VIDEO = "/media/login-ambient.mp4";
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
+
+const AuthLayout = ({ children, aside }: AuthLayoutProps) => {
+  const reducedMotion = usePrefersReducedMotion();
+
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
-      {/* Full-screen gradient background: purple left → white right */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(105deg, hsl(267,56%,45%) 0%, hsl(270,50%,55%) 25%, hsl(275,45%,65%) 40%, hsl(280,35%,78%) 55%, hsl(0,0%,96%) 70%, hsl(0,0%,100%) 100%)",
-        }}
-      />
+    <div className="min-h-screen w-full bg-background lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">
+      {/* Painel fotográfico */}
+      <aside className="relative h-52 overflow-hidden sm:h-64 lg:sticky lg:top-0 lg:m-3 lg:h-[calc(100vh-1.5rem)] lg:rounded-2xl">
+        <img src={corridor} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        {!reducedMotion && (
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            src={AMBIENT_VIDEO}
+            poster={corridor}
+            autoPlay
+            muted
+            loop
+            playsInline
+            aria-hidden="true"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[hsl(192_45%_8%/0.88)] via-[hsl(192_45%_8%/0.25)] to-[hsl(192_45%_8%/0.35)]" />
 
-      {/* Doctor image as duotone texture */}
-      <div
-        className="absolute inset-0 opacity-[0.14]"
-        style={{
-          backgroundImage: `url(${doctorHero})`,
-          backgroundSize: "58% auto",
-          backgroundPosition: "12% center",
-          backgroundRepeat: "no-repeat",
-          mixBlendMode: "luminosity",
-          filter: "blur(2px) contrast(1.06) brightness(0.92)",
-          maskImage:
-            "radial-gradient(ellipse 64% 82% at 24% 50%, hsla(0, 0%, 0%, 1) 14%, hsla(0, 0%, 0%, 0.96) 32%, hsla(0, 0%, 0%, 0.74) 50%, hsla(0, 0%, 0%, 0.36) 66%, hsla(0, 0%, 0%, 0.12) 76%, transparent 84%)",
-          WebkitMaskImage:
-            "radial-gradient(ellipse 64% 82% at 24% 50%, hsla(0, 0%, 0%, 1) 14%, hsla(0, 0%, 0%, 0.96) 32%, hsla(0, 0%, 0%, 0.74) 50%, hsla(0, 0%, 0%, 0.36) 66%, hsla(0, 0%, 0%, 0.12) 76%, transparent 84%)",
-        }}
-      />
-      {/* Purple duotone overlay */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(to right, hsl(267,56%,50%,0.35) 0%, transparent 50%)",
-          mixBlendMode: "color",
-        }}
-      />
+        <div className="absolute left-5 top-5 lg:left-8 lg:top-8">
+          <BrandLockup inverted />
+        </div>
 
-      {/* Content layer */}
-      <div className="relative z-10 flex min-h-screen items-center justify-between px-6 sm:px-12 lg:px-20 py-10">
-        {marketing && (
-          <div className="hidden lg:flex flex-col justify-center max-w-lg xl:max-w-xl flex-shrink-0 pr-12 relative">
-            <h1 className="text-white text-5xl xl:text-6xl font-bold leading-tight tracking-tight mb-6">
-              {marketing.title}
+        {aside && (
+          <div className="absolute inset-x-8 bottom-10 hidden max-w-xl lg:block xl:inset-x-12 xl:bottom-14">
+            <h1 className="rise-in font-display text-5xl leading-[1.04] text-white xl:text-[4.25rem] [&_em]:text-[hsl(36_60%_72%)]">
+              {aside.title}
             </h1>
-            <p className="text-white/80 text-lg xl:text-xl leading-relaxed max-w-md">
-              {marketing.subtitle}
+            <p className="rise-in mt-6 max-w-md text-[15px] leading-relaxed text-white/75 [animation-delay:120ms]">
+              {aside.caption}
             </p>
           </div>
         )}
+      </aside>
 
-        <div className={marketing ? "w-full max-w-[440px] mx-auto lg:mx-0 lg:ml-auto" : "w-full max-w-[520px] mx-auto"}>
-          {children}
+      {/* Coluna do formulário */}
+      <main className="paper-grain flex min-h-[calc(100vh-13rem)] flex-col px-5 py-8 sm:px-10 lg:min-h-screen lg:px-14 xl:px-20">
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full max-w-[400px]">{children}</div>
         </div>
-      </div>
 
-      {/* Mobile texture */}
-      <div
-        className="lg:hidden absolute inset-0 opacity-[0.06] -z-0"
-        style={{
-          backgroundImage: `url(${doctorHero})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "grayscale(1)",
-        }}
-      />
-
-      <p className="absolute bottom-5 left-6 sm:left-12 lg:left-20 z-10 text-white/40 text-xs">
-        © 2026 Prontuário-Pro. Todos os direitos reservados.
-      </p>
+        <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            Ambiente protegido · dados tratados conforme a LGPD
+          </span>
+          <span className="inline-flex items-center gap-1.5 font-mono">
+            <BrandMark className="h-3.5 w-3.5" />© {new Date().getFullYear()}
+          </span>
+        </footer>
+      </main>
     </div>
   );
 };
