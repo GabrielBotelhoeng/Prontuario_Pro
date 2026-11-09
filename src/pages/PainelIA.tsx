@@ -201,7 +201,7 @@ export default function PainelIA() {
         className="max-w-7xl mx-auto space-y-6 -m-4 lg:-m-8 p-4 lg:p-8 min-h-[calc(100vh-4rem)]"
         style={{
           background:
-            "linear-gradient(160deg, hsl(240 35% 97%) 0%, hsl(260 40% 96%) 50%, hsl(220 35% 95%) 100%)",
+            "linear-gradient(160deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%)",
         }}
       >
         {/* Header */}
@@ -209,22 +209,22 @@ export default function PainelIA() {
           className="relative rounded-2xl overflow-hidden border border-primary/20 p-6 lg:p-7"
           style={{
             background:
-              "linear-gradient(135deg, hsl(230 45% 18%) 0%, hsl(258 50% 28%) 50%, hsl(270 50% 35%) 100%)",
-            boxShadow: "0 12px 40px -12px hsl(258 50% 25% / 0.4)",
+              "linear-gradient(135deg, hsl(192 45% 9%) 0%, hsl(190 40% 14%) 55%, hsl(186 50% 20%) 100%)",
+            boxShadow: "0 12px 40px -12px hsl(192 45% 10% / 0.45)",
           }}
         >
           <div
             className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full opacity-40 blur-3xl"
             style={{
               background:
-                "radial-gradient(circle, hsl(270 80% 60% / 0.6), transparent 70%)",
+                "radial-gradient(circle, hsl(36 60% 60% / 0.35), transparent 70%)",
             }}
           />
           <div
             className="pointer-events-none absolute -bottom-20 -left-20 w-64 h-64 rounded-full opacity-30 blur-3xl"
             style={{
               background:
-                "radial-gradient(circle, hsl(220 80% 60% / 0.6), transparent 70%)",
+                "radial-gradient(circle, hsl(180 45% 50% / 0.4), transparent 70%)",
             }}
           />
           <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">

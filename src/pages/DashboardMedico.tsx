@@ -21,7 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useConsultasMedico, useProximaConsultaMedico } from "@/hooks/useConsultas";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import clinicImg from "@/assets/clinic-reception.jpg";
+import consultorioImg from "@/assets/consultorio.webp";
 
 const navItems: NavItem[] = [
   { title: "Início", url: "/medico", icon: Home },
@@ -56,24 +56,30 @@ export default function DashboardMedico() {
     { label: "Pacientes aguardando", value: String(aguardando), icon: UserRound, trend: "agora" },
   ];
 
-  const nomeDisplay = profile?.nome ?? "Doutor(a)";
-  const clinicaNome = medico?.clinica_nome ?? "Consultório";
+  const primeiroNome = profile?.nome?.split(" ")[0] ?? "Doutor(a)";
+  const especialidade = medico?.especialidade ?? "Corpo clínico";
+  const hora = new Date().getHours();
+  const saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
 
   return (
     <DashboardLayout navItems={navItems}>
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Hero Card */}
-        <div className="bg-card border border-border/40 rounded-2xl overflow-hidden" style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)" }}>
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex flex-col lg:flex-row">
             <div className="flex-1 p-8 lg:p-10 flex flex-col justify-center">
-              <p className="text-primary text-sm font-semibold tracking-wide uppercase mb-2">Bem-vindo de volta</p>
-              <h1 className="text-foreground text-2xl lg:text-3xl font-bold tracking-tight mb-4">{clinicaNome}</h1>
+              <p className="eyebrow mb-4">{especialidade}</p>
+              <h1 className="font-display text-4xl lg:text-5xl leading-[1.02] text-foreground mb-4">
+                {saudacao}, <em>{primeiroNome}</em>.
+              </h1>
               <p className="text-muted-foreground text-[15px] leading-relaxed max-w-lg">
-                Olá, {nomeDisplay}. Você tem {consultasHoje.length} {consultasHoje.length === 1 ? "consulta" : "consultas"} agendadas para hoje.
+                Você tem{" "}
+                <span className="font-mono text-foreground">{String(consultasHoje.length).padStart(2, "0")}</span>{" "}
+                {consultasHoje.length === 1 ? "consulta agendada" : "consultas agendadas"} para hoje.
               </p>
             </div>
             <div className="lg:w-[380px] xl:w-[440px] h-56 lg:h-auto flex-shrink-0">
-              <img src={clinicImg} alt="Consultório" className="w-full h-full object-cover" width={1280} height={720} />
+              <img src={consultorioImg} alt="" className="w-full h-full object-cover" width={1200} height={900} />
             </div>
           </div>
         </div>
@@ -82,7 +88,7 @@ export default function DashboardMedico() {
         <div
           className="relative rounded-2xl overflow-hidden border border-primary/20 p-6 lg:p-7"
           style={{
-            background: "linear-gradient(135deg, hsl(var(--primary) / 0.08) 0%, hsl(270 70% 96%) 50%, hsl(var(--primary) / 0.06) 100%)",
+            background: "linear-gradient(135deg, hsl(var(--primary) / 0.08) 0%, hsl(var(--secondary)) 50%, hsl(var(--primary) / 0.06) 100%)",
             boxShadow: "0 8px 32px -12px hsl(var(--primary) / 0.25), inset 0 1px 0 0 hsl(0 0% 100% / 0.6)",
           }}
         >

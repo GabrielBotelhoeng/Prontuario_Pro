@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
 
 const CATEGORIA_COR: Record<DocumentoCategoria, string> = {
   exame_laboratorial: "bg-blue-500/10 text-blue-700 border-blue-200",
-  exame_imagem: "bg-violet-500/10 text-violet-700 border-violet-200",
+  exame_imagem: "bg-sky-500/10 text-sky-700 border-sky-200",
   receita: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
   atestado: "bg-amber-500/10 text-amber-700 border-amber-200",
   laudo: "bg-rose-500/10 text-rose-700 border-rose-200",

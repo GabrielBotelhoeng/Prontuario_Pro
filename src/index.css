@@ -1,79 +1,93 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Prontuário-Pro — "Clínico editorial"
+ * Dominante: petróleo profundo · Neutro: papel quente · Acento raro: latão
+ */
 @layer base {
   :root {
-    --background: 267 30% 97%;
-    --foreground: 250 15% 15%;
+    --background: 40 23% 97%;
+    --foreground: 195 32% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 250 15% 15%;
+    --card-foreground: 195 32% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 250 15% 15%;
+    --popover-foreground: 195 32% 11%;
 
-    --primary: 267 56% 53%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 186 62% 24%;
+    --primary-foreground: 40 30% 98%;
 
-    --secondary: 267 30% 96%;
-    --secondary-foreground: 267 56% 40%;
+    --secondary: 185 22% 93%;
+    --secondary-foreground: 186 62% 20%;
 
-    --muted: 267 20% 93%;
-    --muted-foreground: 250 10% 50%;
+    --muted: 40 16% 93%;
+    --muted-foreground: 195 9% 40%;
 
-    --accent: 267 30% 93%;
-    --accent-foreground: 267 56% 40%;
+    --accent: 185 24% 93%;
+    --accent-foreground: 186 62% 20%;
 
-    --destructive: 0 72% 51%;
+    --brass: 36 52% 52%;
+    --brass-foreground: 36 60% 18%;
+
+    --success: 152 45% 32%;
+    --warning: 34 85% 44%;
+
+    --destructive: 2 64% 46%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 267 15% 90%;
-    --input: 267 15% 88%;
-    --ring: 267 56% 53%;
+    --border: 40 14% 87%;
+    --input: 40 12% 84%;
+    --ring: 186 62% 30%;
 
-    --radius: 0.875rem;
+    --radius: 0.625rem;
 
-    --sidebar-background: 267 40% 22%;
-    --sidebar-foreground: 267 20% 90%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 267 56% 53%;
-    --sidebar-accent: 267 30% 28%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 267 30% 28%;
-    --sidebar-ring: 267 56% 53%;
+    --sidebar-background: 192 42% 10%;
+    --sidebar-foreground: 185 14% 82%;
+    --sidebar-primary: 40 30% 98%;
+    --sidebar-primary-foreground: 186 62% 24%;
+    --sidebar-accent: 190 34% 16%;
+    --sidebar-accent-foreground: 40 30% 98%;
+    --sidebar-border: 190 30% 17%;
+    --sidebar-ring: 36 52% 52%;
   }
 
   .dark {
-    --background: 250 20% 8%;
-    --foreground: 0 0% 95%;
-    --card: 250 20% 10%;
-    --card-foreground: 0 0% 95%;
-    --popover: 250 20% 10%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 267 56% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 267 20% 18%;
-    --secondary-foreground: 267 30% 80%;
-    --muted: 250 15% 15%;
-    --muted-foreground: 250 10% 55%;
-    --accent: 267 20% 18%;
-    --accent-foreground: 267 30% 80%;
-    --destructive: 0 62% 50%;
+    --background: 195 26% 7%;
+    --foreground: 40 18% 93%;
+    --card: 195 24% 10%;
+    --card-foreground: 40 18% 93%;
+    --popover: 195 24% 10%;
+    --popover-foreground: 40 18% 93%;
+    --primary: 180 44% 52%;
+    --primary-foreground: 195 32% 8%;
+    --secondary: 190 22% 15%;
+    --secondary-foreground: 180 30% 82%;
+    --muted: 195 18% 14%;
+    --muted-foreground: 190 8% 60%;
+    --accent: 190 22% 15%;
+    --accent-foreground: 180 30% 82%;
+    --brass: 38 58% 62%;
+    --brass-foreground: 36 60% 12%;
+    --success: 152 40% 48%;
+    --warning: 36 85% 56%;
+    --destructive: 2 62% 54%;
     --destructive-foreground: 0 0% 100%;
-    --border: 250 15% 18%;
-    --input: 250 15% 20%;
-    --ring: 267 56% 60%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 195 16% 18%;
+    --input: 195 16% 22%;
+    --ring: 180 44% 52%;
+    --sidebar-background: 195 30% 5%;
+    --sidebar-foreground: 185 12% 78%;
+    --sidebar-primary: 180 44% 52%;
+    --sidebar-primary-foreground: 195 32% 8%;
+    --sidebar-accent: 195 22% 11%;
+    --sidebar-accent-foreground: 40 18% 93%;
+    --sidebar-border: 195 20% 13%;
+    --sidebar-ring: 38 58% 62%;
   }
 }
 
@@ -83,9 +97,71 @@
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3 {
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+  }
+}
+
+@layer components {
+  /* Título editorial: serifa com ênfase em itálico (<em>) */
+  .font-display em {
+    font-style: italic;
+    color: hsl(var(--primary));
+  }
+
+  /* Grão sutil de papel sobre superfícies amplas */
+  .paper-grain {
+    position: relative;
+    isolation: isolate;
+  }
+  .paper-grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.35;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.15 0 0 0 0 0.17 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Rótulo de seção: versalete espaçado */
+  .eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground;
+  }
+}
+
+@layer utilities {
+  .vital-line path {
+    stroke-dasharray: 1200;
+    stroke-dashoffset: 1200;
+    animation: vital-draw 2.4s cubic-bezier(0.65, 0, 0.35, 1) 0.3s forwards;
+  }
+
+  @keyframes vital-draw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  .rise-in {
+    animation: rise-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vital-line path { animation: none; stroke-dashoffset: 0; }
+    .rise-in { animation: none; }
   }
 }

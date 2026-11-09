@@ -1,182 +1,243 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { ArrowLeft, KeyRound } from "lucide-react";
+import { useAuth, type LoginTipo } from "@/contexts/AuthContext";
 import { maskCPF, maskCRM } from "@/lib/masks";
-import doctorHero from "@/assets/doctor-hero.jpg";
-import logoIcon from "@/assets/logo-icon.png";
+import { cn } from "@/lib/utils";
+import AuthLayout from "@/components/AuthLayout";
+import { VitalLine } from "@/components/Brand";
+import { homeFor } from "@/lib/rotas";
+import { AuthError, AuthSubmit, PasswordInput, authInputClass } from "@/components/auth/AuthPrimitives";
 
-type UserType = "medico" | "paciente";
+const MODO_KEY = "prontuario:loginModo";
+
+const MODOS: Record<LoginTipo, {
+  rotulo: string;
+  campo: string;
+  placeholder: string;
+  subtitulo: string;
+}> = {
+  medico: {
+    rotulo: "Profissional",
+    campo: "CRM",
+    placeholder: "123456/UF",
+    subtitulo: "Entre com seu CRM para acessar agenda, prontuários e prescrições.",
+  },
+  paciente: {
+    rotulo: "Paciente",
+    campo: "CPF",
+    placeholder: "000.000.000-00",
+    subtitulo: "Acompanhe consultas, receitas e seu histórico clínico.",
+  },
+  admin: {
+    rotulo: "Administração",
+    campo: "E-mail institucional",
+    placeholder: "nome@hospital.com.br",
+    subtitulo: "Gestão de contas, acessos e auditoria do hospital.",
+  },
+};
+
+function saudacao() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+function lerModoSalvo(): LoginTipo {
+  try {
+    const v = localStorage.getItem(MODO_KEY);
+    return v === "paciente" || v === "medico" ? v : "medico";
+  } catch {
+    return "medico";
+  }
+}
 
 const Index = () => {
-  const [userType, setUserType] = useState<UserType>("medico");
-  const [cpfCrm, setCpfCrm] = useState("");
+  const [modo, setModo] = useState<LoginTipo>(lerModoSalvo);
+  const [identificador, setIdentificador] = useState("");
   const [senha, setSenha] = useState("");
+  const [capsLock, setCapsLock] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
-  const { signIn } = useAuth();
+  const { signIn, profile, user } = useAuth();
   const navigate = useNavigate();
+
+  // Já autenticado (ou login acabou de concluir): segue para a área correta.
+  useEffect(() => {
+    if (user && profile) {
+      navigate(profile.precisa_trocar_senha ? "/primeiro-acesso" : homeFor(profile.tipo), { replace: true });
+    }
+  }, [user, profile, navigate]);
+
+  const trocarModo = (novo: LoginTipo) => {
+    setModo(novo);
+    setIdentificador("");
+    setErro("");
+    if (novo !== "admin") {
+      try {
+        localStorage.setItem(MODO_KEY, novo);
+      } catch {
+        /* armazenamento indisponível: preferência não persiste */
+      }
+    }
+  };
+
+  const handleIdentificador = (v: string) => {
+    if (modo === "medico") setIdentificador(maskCRM(v));
+    else if (modo === "paciente") setIdentificador(maskCPF(v));
+    else setIdentificador(v);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro("");
     setLoading(true);
     try {
-      await signIn(userType, cpfCrm.trim(), senha);
-      navigate(userType === "medico" ? "/medico" : "/paciente");
+      await signIn(modo, identificador.trim(), senha);
+      // O redirecionamento acontece no efeito acima, quando o perfil carregar.
     } catch (err: unknown) {
-      setErro((err as Error).message ?? "Erro ao fazer login.");
-    } finally {
+      setErro((err as Error).message ?? "Erro ao entrar.");
       setLoading(false);
     }
   };
 
+  const detectarCaps = (e: React.KeyboardEvent<HTMLInputElement>) =>
+    setCapsLock(e.getModifierState?.("CapsLock") ?? false);
+
+  const cfg = MODOS[modo];
+  const isAdmin = modo === "admin";
+
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(105deg, hsl(267,56%,45%) 0%, hsl(270,50%,55%) 25%, hsl(275,45%,65%) 40%, hsl(280,35%,78%) 55%, hsl(0,0%,96%) 70%, hsl(0,0%,100%) 100%)",
-        }}
-      />
-      <div
-        className="absolute inset-0 opacity-[0.14]"
-        style={{
-          backgroundImage: `url(${doctorHero})`,
-          backgroundSize: "58% auto",
-          backgroundPosition: "12% center",
-          backgroundRepeat: "no-repeat",
-          mixBlendMode: "luminosity",
-          filter: "blur(2px) contrast(1.06) brightness(0.92)",
-          maskImage:
-            "radial-gradient(ellipse 64% 82% at 24% 50%, hsla(0, 0%, 0%, 1) 14%, hsla(0, 0%, 0%, 0.96) 32%, hsla(0, 0%, 0%, 0.74) 50%, hsla(0, 0%, 0%, 0.36) 66%, hsla(0, 0%, 0%, 0.12) 76%, transparent 84%)",
-          WebkitMaskImage:
-            "radial-gradient(ellipse 64% 82% at 24% 50%, hsla(0, 0%, 0%, 1) 14%, hsla(0, 0%, 0%, 0.96) 32%, hsla(0, 0%, 0%, 0.74) 50%, hsla(0, 0%, 0%, 0.36) 66%, hsla(0, 0%, 0%, 0.12) 76%, transparent 84%)",
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background: "linear-gradient(to right, hsl(267,56%,50%,0.35) 0%, transparent 50%)",
-          mixBlendMode: "color",
-        }}
-      />
+    <AuthLayout
+      aside={{
+        title: (
+          <>
+            O cuidado começa
+            <br />
+            por um <em>registro</em> confiável.
+          </>
+        ),
+        caption:
+          "Prontuário eletrônico do hospital: agenda, anamnese, prescrição digital e histórico do paciente em um só lugar, com trilha de auditoria LGPD.",
+      }}
+    >
+      <VitalLine className="-mx-1 mb-6 h-8 opacity-70" />
 
-      <div className="relative z-10 flex min-h-screen items-center justify-between px-6 sm:px-12 lg:px-20">
-        <div className="hidden lg:flex flex-col justify-center max-w-lg xl:max-w-xl flex-shrink-0 pr-12 relative">
-          <h1 className="text-white text-5xl xl:text-6xl font-bold leading-tight tracking-tight mb-6 animate-in fade-in slide-in-from-left-4 duration-500">
-            {userType === "medico" ? (
-              <>Gestão clínica<br />completa.</>
-            ) : (
-              <>Sua saúde em<br />suas mãos.</>
-            )}
-          </h1>
-          <p className="text-white/80 text-lg xl:text-xl leading-relaxed max-w-md animate-in fade-in slide-in-from-left-6 duration-700">
-            {userType === "medico"
-              ? "Gerencie seus pacientes e prontuários com tranquilidade em uma única plataforma segura e intuitiva."
-              : "Acompanhe suas consultas, receitas e histórico médico em um só lugar com total segurança."}
-          </p>
-        </div>
+      <p className="eyebrow mb-3">{isAdmin ? "Acesso restrito" : "Acesso ao prontuário"}</p>
+      <h2 className="font-display text-[2.6rem] leading-none text-foreground">
+        {saudacao()}<em>.</em>
+      </h2>
+      <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">{cfg.subtitulo}</p>
 
-        <div className="w-full max-w-[440px] mx-auto lg:mx-0 lg:ml-auto">
-          <div
-            className="bg-white rounded-2xl p-8 sm:p-10"
-            style={{ boxShadow: "0 4px 40px -8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04)" }}
-          >
-            <div className="flex flex-col items-center gap-2 mb-10">
-              <img src={logoIcon} alt="Prontuário-Pro" className="w-11 h-11" />
-              <span className="text-primary text-lg font-semibold tracking-tight">Prontuário-Pro</span>
-            </div>
-
-            <div className="text-center mb-7">
-              <h2 className="text-foreground text-2xl font-semibold tracking-tight mb-1">Bem-vindo de volta</h2>
-              <p className="text-muted-foreground text-[15px]">Acesse sua conta para continuar</p>
-            </div>
-
-            {/* Segmented Control */}
-            <div className="relative bg-muted rounded-xl p-1 flex mb-7">
-              <div
-                className="absolute top-1 bottom-1 rounded-[10px] bg-primary shadow-md transition-all duration-300 ease-out"
-                style={{ left: userType === "medico" ? "4px" : "50%", width: "calc(50% - 4px)" }}
-              />
-              {(["medico", "paciente"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => { setUserType(type); setErro(""); }}
-                  className={`relative z-10 flex-1 py-2.5 text-sm font-medium rounded-[10px] transition-colors duration-300 ${
-                    userType === type ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {type === "medico" ? "Médico" : "Paciente"}
-                </button>
-              ))}
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-foreground text-sm font-medium">
-                  {userType === "medico" ? "CRM" : "CPF"}
-                </label>
-                <input
-                  type="text"
-                  value={cpfCrm}
-                  onChange={(e) =>
-                    setCpfCrm(userType === "medico" ? maskCRM(e.target.value) : maskCPF(e.target.value))
-                  }
-                  maxLength={userType === "medico" ? 9 : 14}
-                  placeholder={userType === "medico" ? "Digite seu CRM" : "000.000.000-00"}
-                  required
-                  className="w-full h-12 px-4 rounded-xl bg-muted/40 border border-border text-foreground text-sm placeholder:text-muted-foreground/50 outline-none transition-all duration-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 focus:bg-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-foreground text-sm font-medium">Senha</label>
-                <input
-                  type="password"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  placeholder="Digite sua senha"
-                  required
-                  className="w-full h-12 px-4 rounded-xl bg-muted/40 border border-border text-foreground text-sm placeholder:text-muted-foreground/50 outline-none transition-all duration-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 focus:bg-white"
-                />
-              </div>
-
-              {erro && (
-                <p className="text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-xl px-4 py-2.5">
-                  {erro}
-                </p>
+      {isAdmin ? (
+        <button
+          type="button"
+          onClick={() => trocarModo(lerModoSalvo())}
+          className="mt-7 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline underline-offset-4"
+        >
+          <ArrowLeft className="h-4 w-4" /> Voltar ao acesso clínico
+        </button>
+      ) : (
+        <div role="tablist" aria-label="Tipo de acesso" className="mt-7 grid grid-cols-2 border-b border-border">
+          {(["medico", "paciente"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={modo === t}
+              onClick={() => trocarModo(t)}
+              className={cn(
+                "relative pb-3 text-left text-sm font-medium transition-colors",
+                modo === t ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/20 transition-all duration-300 hover:opacity-90 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {loading && <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />}
-                {loading ? "Entrando..." : "Entrar"}
-              </button>
-            </form>
-
-            <div className="flex flex-col items-center gap-3 mt-6">
-              <Link to="/esqueci-senha" className="text-primary text-sm font-medium transition-all duration-300 hover:opacity-70 underline-offset-4 hover:underline">
-                Esqueci minha senha
-              </Link>
-              <p className="text-muted-foreground text-sm">
-                Novo aqui?{" "}
-                <Link to="/cadastro" className="text-primary font-semibold transition-all duration-300 hover:opacity-70 underline-offset-4 hover:underline">
-                  Crie uma conta
-                </Link>
-              </p>
-            </div>
-          </div>
+            >
+              {MODOS[t].rotulo}
+              <span
+                className={cn(
+                  "absolute -bottom-px left-0 h-[2px] bg-primary transition-all duration-300",
+                  modo === t ? "w-full" : "w-0",
+                )}
+              />
+            </button>
+          ))}
         </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="mt-7 space-y-5" noValidate>
+        <div className="space-y-2">
+          <label htmlFor="identificador" className="text-sm font-medium text-foreground">
+            {cfg.campo}
+          </label>
+          <input
+            id="identificador"
+            type={isAdmin ? "email" : "text"}
+            inputMode={modo === "paciente" ? "numeric" : isAdmin ? "email" : "text"}
+            autoComplete="username"
+            autoCapitalize={isAdmin ? "none" : "characters"}
+            spellCheck={false}
+            value={identificador}
+            onChange={(e) => handleIdentificador(e.target.value)}
+            maxLength={modo === "medico" ? 9 : modo === "paciente" ? 14 : 120}
+            placeholder={cfg.placeholder}
+            required
+            aria-invalid={!!erro}
+            className={cn(authInputClass, !isAdmin && "font-mono tracking-wide")}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between">
+            <label htmlFor="senha" className="text-sm font-medium text-foreground">
+              Senha
+            </label>
+            <Link to="/esqueci-senha" className="text-xs font-medium text-primary hover:underline underline-offset-4">
+              Esqueci minha senha
+            </Link>
+          </div>
+          <PasswordInput
+            id="senha"
+            autoComplete="current-password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            onKeyUp={detectarCaps}
+            onKeyDown={detectarCaps}
+            placeholder="••••••••"
+            required
+            aria-invalid={!!erro}
+          />
+          {capsLock && (
+            <p className="text-xs font-medium text-warning">Caps Lock está ativado.</p>
+          )}
+        </div>
+
+        <AuthError>{erro}</AuthError>
+
+        <AuthSubmit loading={loading} loadingText="Verificando credenciais" disabled={!identificador || !senha}>
+          Entrar
+        </AuthSubmit>
+      </form>
+
+      <div className="mt-8 rounded-lg border border-dashed border-border px-4 py-3.5 text-[13px] leading-relaxed text-muted-foreground">
+        {modo === "paciente" ? (
+          <>Ainda não tem acesso? Solicite na <strong className="font-medium text-foreground">recepção do hospital</strong> com um documento com foto.</>
+        ) : modo === "medico" ? (
+          <>Contas de profissionais são criadas pela <strong className="font-medium text-foreground">administração do hospital</strong>.</>
+        ) : (
+          <>Somente contas autorizadas pela TI. Todas as ações são registradas.</>
+        )}
       </div>
 
-      <p className="absolute bottom-5 left-6 sm:left-12 lg:left-20 z-10 text-white/40 text-xs">
-        © 2026 Prontuário-Pro. Todos os direitos reservados.
-      </p>
-    </div>
+      {!isAdmin && (
+        <button
+          type="button"
+          onClick={() => trocarModo("admin")}
+          className="mt-5 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <KeyRound className="h-3.5 w-3.5" /> Acesso da administração
+        </button>
+      )}
+    </AuthLayout>
   );
 };
 

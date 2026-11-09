@@ -1,26 +1,31 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import type { Profile } from "@/lib/database.types";
+import PageLoader from "@/components/PageLoader";
+import { homeFor } from "@/lib/rotas";
+
+type Tipo = Profile["tipo"];
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredTipo?: "medico" | "paciente";
+  requiredTipo?: Tipo;
 }
 
 export default function ProtectedRoute({ children, requiredTipo }: ProtectedRouteProps) {
   const { user, profile, loading } = useAuth();
+  const location = useLocation();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
+  if (loading || (user && !profile)) return <PageLoader />;
 
   if (!user) return <Navigate to="/" replace />;
 
+  // Conta provisionada pela administração: troca de senha obrigatória antes de tudo.
+  if (profile?.precisa_trocar_senha && location.pathname !== "/primeiro-acesso") {
+    return <Navigate to="/primeiro-acesso" replace />;
+  }
+
   if (requiredTipo && profile?.tipo !== requiredTipo) {
-    return <Navigate to={profile?.tipo === "medico" ? "/medico" : "/paciente"} replace />;
+    return <Navigate to={homeFor(profile?.tipo)} replace />;
   }
 
   return <>{children}</>;

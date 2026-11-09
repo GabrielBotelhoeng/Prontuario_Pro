@@ -1,0 +1,5 @@
+project_id = "woqsgtjpublcjqhwgjtj"
+
+# A função valida o JWT por conta própria (auth.getUser + papel admin).
+[functions.admin-usuarios]
+verify_jwt = false

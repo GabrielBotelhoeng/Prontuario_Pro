@@ -488,8 +488,8 @@ export default function Anamnese() {
                 className="rounded-2xl p-6 border border-primary/20 relative overflow-hidden"
                 style={{
                   background:
-                    "linear-gradient(160deg, hsl(267 60% 98%) 0%, hsl(267 50% 96%) 60%, hsl(270 55% 94%) 100%)",
-                  boxShadow: "0 4px 30px -8px hsl(267 60% 50% / 0.18)",
+                    "linear-gradient(160deg, hsl(var(--card)) 0%, hsl(var(--secondary)) 100%)",
+                  boxShadow: "0 4px 30px -8px hsl(var(--primary) / 0.16)",
                 }}
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
