@@ -168,19 +168,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // login_lookup só retorna email quando a senha confere — fecha enumeration.
     // Mesma resposta (NULL) para "identificador não existe" ou "senha errada".
     let email: string | null = null;
-    const { data: e1 } = await supabase.rpc("login_lookup", {
+    // Erro na RPC ≠ senha errada: não mascarar como "credenciais inválidas"
+    // (foi assim que uma regressão no login passou despercebida).
+    const indisponivel = "Não foi possível verificar suas credenciais agora. Tente novamente em instantes.";
+    const { data: e1, error: erroLookup } = await supabase.rpc("login_lookup", {
       p_identifier: docOriginal,
       p_tipo: tipo,
       p_password: senha,
     });
+    if (erroLookup) {
+      console.error("[auth] login_lookup falhou:", erroLookup.message);
+      throw new Error(indisponivel);
+    }
     if (e1) {
       email = e1;
     } else if (docSemMascara !== docOriginal) {
-      const { data: e2 } = await supabase.rpc("login_lookup", {
+      const { data: e2, error: erroLookup2 } = await supabase.rpc("login_lookup", {
         p_identifier: docSemMascara,
         p_tipo: tipo,
         p_password: senha,
       });
+      if (erroLookup2) throw new Error(indisponivel);
       if (e2) email = e2;
     }
 
