@@ -95,7 +95,7 @@ describe("signIn — CRM/CPF", () => {
     expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({ email: "ana@hospital.com", password: "segredo1" });
   });
 
-  it("tenta novamente sem máscara quando a primeira busca falha", async () => {
+  it("faz uma única consulta por tentativa (o banco normaliza a máscara)", async () => {
     const { result } = renderAuth();
 
     await act(async () => {
@@ -103,9 +103,30 @@ describe("signIn — CRM/CPF", () => {
     });
 
     const lookups = rpcCalls.filter((c) => c.name === "login_lookup");
-    expect(lookups).toHaveLength(2);
-    expect(lookups[1].args).toMatchObject({ p_identifier: "12345678909" });
+    expect(lookups).toHaveLength(1);
+    expect(lookups[0].args).toMatchObject({ p_identifier: "123.456.789-09" });
     expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("mostra a mensagem de bloqueio quando o banco recusa por excesso de tentativas", async () => {
+    mocked(supabase.rpc).mockResolvedValueOnce({
+      data: null,
+      error: { code: "PT429", message: "Muitas tentativas de acesso. Tente novamente em 15 minuto(s)." },
+    });
+    const { result } = renderAuth();
+
+    await act(async () => {
+      await expect(result.current.signIn("medico", "123456/SP", "x")).rejects.toThrow(/Muitas tentativas/);
+    });
+  });
+
+  it("erro inesperado no banco não aparece como senha errada", async () => {
+    mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { code: "42883", message: "function crypt does not exist" } });
+    const { result } = renderAuth();
+
+    await act(async () => {
+      await expect(result.current.signIn("medico", "123456/SP", "x")).rejects.toThrow(/Não foi possível verificar/);
+    });
   });
 });
 

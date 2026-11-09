@@ -126,9 +126,9 @@ export default function ReceitasPaciente() {
                       Emitida em {format(new Date(selecionada.data_emissao), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                     </DialogDescription>
                     <div className="mt-2">
-                      <Badge className="bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 rounded-full text-[10px] font-semibold tracking-wide">
+                      <Badge variant="secondary" className="rounded-full text-[10px] font-semibold tracking-wide">
                         <ShieldCheck className="h-3 w-3 mr-1" />
-                        ASSINADO DIGITALMENTE
+                        VERIFICÁVEL POR QR CODE
                       </Badge>
                     </div>
                   </div>

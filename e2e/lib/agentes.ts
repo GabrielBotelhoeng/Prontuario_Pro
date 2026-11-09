@@ -42,21 +42,12 @@ export class Agente {
       return;
     }
 
-    const original = identificador.trim();
-    const semMascara = original.replace(/[.\-\s]/g, "");
-    let email: string | null = null;
-    for (const tentativa of original === semMascara ? [original] : [original, semMascara]) {
-      const { data, error } = await this.cliente.rpc("login_lookup", {
-        p_identifier: tentativa,
-        p_tipo: this.papel,
-        p_password: senha,
-      });
-      if (error) throw new Error(`login_lookup falhou: ${error.message}`);
-      if (data) {
-        email = data as string;
-        break;
-      }
-    }
+    const { data: email, error: erroLookup } = await this.cliente.rpc("login_lookup", {
+      p_identifier: identificador.trim(),
+      p_tipo: this.papel,
+      p_password: senha,
+    });
+    if (erroLookup) throw new Error(erroLookup.code === "PT429" ? erroLookup.message : `login_lookup falhou: ${erroLookup.message}`);
     if (!email) throw new Error("Credenciais inválidas.");
 
     const { data, error } = await this.cliente.auth.signInWithPassword({ email, password: senha });

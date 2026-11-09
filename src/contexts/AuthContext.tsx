@@ -163,33 +163,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const docOriginal = identificador.trim();
-    const docSemMascara = docOriginal.replace(/[.\-\s]/g, "");
 
-    // login_lookup só retorna email quando a senha confere — fecha enumeration.
-    // Mesma resposta (NULL) para "identificador não existe" ou "senha errada".
-    let email: string | null = null;
-    // Erro na RPC ≠ senha errada: não mascarar como "credenciais inválidas"
-    // (foi assim que uma regressão no login passou despercebida).
-    const indisponivel = "Não foi possível verificar suas credenciais agora. Tente novamente em instantes.";
-    const { data: e1, error: erroLookup } = await supabase.rpc("login_lookup", {
+    // login_lookup normaliza CRM/CPF no banco e só devolve o e-mail quando a
+    // senha confere (anti-enumeração). Uma chamada por tentativa: o banco conta
+    // as falhas e bloqueia após 5 (HTTP 429 / PT429). Erro de RPC não é
+    // "credenciais inválidas" — foi assim que uma regressão passou despercebida.
+    const { data: email, error: erroLookup } = await supabase.rpc("login_lookup", {
       p_identifier: docOriginal,
       p_tipo: tipo,
       p_password: senha,
     });
     if (erroLookup) {
+      if (erroLookup.code === "PT429") throw new Error(erroLookup.message);
       console.error("[auth] login_lookup falhou:", erroLookup.message);
-      throw new Error(indisponivel);
-    }
-    if (e1) {
-      email = e1;
-    } else if (docSemMascara !== docOriginal) {
-      const { data: e2, error: erroLookup2 } = await supabase.rpc("login_lookup", {
-        p_identifier: docSemMascara,
-        p_tipo: tipo,
-        p_password: senha,
-      });
-      if (erroLookup2) throw new Error(indisponivel);
-      if (e2) email = e2;
+      throw new Error("Não foi possível verificar suas credenciais agora. Tente novamente em instantes.");
     }
 
     if (!email) {

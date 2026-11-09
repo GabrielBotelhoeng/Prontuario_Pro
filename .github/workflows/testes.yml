@@ -1,0 +1,46 @@
+name: Testes
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualidade:
+    name: Typecheck, lint, unitários e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc -p tsconfig.app.json --noEmit
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  agentes-e2e:
+    name: Agentes médico e paciente (Supabase local)
+    runs-on: ubuntu-latest
+    needs: qualidade
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Sobe o Supabase local com todas as migrations
+        run: npm run e2e:db
+      - name: Roda os agentes
+        run: npm run test:e2e
+      - name: Desliga o Supabase
+        if: always()
+        run: npm run e2e:stop
