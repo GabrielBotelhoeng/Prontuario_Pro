@@ -17,7 +17,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import DashboardLayout from "@/components/DashboardLayout";
+import { medicoNavItems as navItems } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,15 +35,6 @@ import {
 } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/medico", icon: Home },
-  { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
-  { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
-  { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
-  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
-  { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
-  { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
-];
 
 const CATEGORIA_COR: Record<DocumentoCategoria, string> = {
   exame_laboratorial: "bg-blue-500/10 text-blue-700 border-blue-200",

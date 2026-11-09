@@ -1,11 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Home, FileText, ClipboardList, CalendarDays, BarChart3,
-  ChevronLeft, ChevronRight, Sparkles, Clock, Stethoscope,
-  X, PlayCircle, Plus, FolderOpen,
-} from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import { Check, ChevronLeft, ChevronRight, PlayCircle, Plus, Stethoscope, X } from "lucide-react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { medicoNavItems as navItems } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { useConsultasMedico, useUpdateConsultaStatus, useCreateConsulta } from "@/hooks/useConsultas";
 import { usePacientesDoMedico } from "@/hooks/usePacientes";
@@ -18,30 +15,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { StatusConsulta } from "@/components/clinico/StatusConsulta";
+import { EstadoVazio } from "@/components/clinico/EstadoVazio";
+import vazioAgenda from "@/assets/vazio/agenda.webp";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/medico", icon: Home },
-  { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
-  { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
-  { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
-  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
-  { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
-  { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
-];
 
-type ViewMode = "Dia" | "Semana" | "Mês";
-type Status = "Confirmado" | "Aguardando" | "Finalizado" | "Em andamento" | "Cancelado";
 
 const monthNames = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const weekDays = ["D","S","T","Q","Q","S","S"];
 
-const statusStyles: Record<Status, string> = {
-  Confirmado: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  Aguardando: "bg-amber-50 text-amber-700 border-amber-200",
-  Finalizado: "bg-muted text-muted-foreground border-border",
-  "Em andamento": "bg-primary/10 text-primary border-primary/30",
-  Cancelado: "bg-red-50 text-red-600 border-red-200",
-};
 
 const TIPOS_CONSULTA = ["Consulta de Rotina", "Retorno", "Urgência", "Telemedicina"] as const;
 
@@ -55,7 +37,6 @@ export default function Agenda() {
   const today = new Date();
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState(today.getDate());
-  const [viewMode, setViewMode] = useState<ViewMode>("Dia");
   const { data: consultas = [], isLoading } = useConsultasMedico();
   const { data: pacientes = [] } = usePacientesDoMedico();
   const updateStatus = useUpdateConsultaStatus();
@@ -75,6 +56,15 @@ export default function Agenda() {
         description: (err as Error).message,
         variant: "destructive",
       });
+    }
+  }
+
+  async function mudarStatus(apt: Consulta, status: Consulta["status"], msg: string) {
+    try {
+      await updateStatus.mutateAsync({ id: apt.id, status });
+      toast({ title: msg });
+    } catch (err: unknown) {
+      toast({ title: "Não foi possível atualizar", description: (err as Error).message, variant: "destructive" });
     }
   }
 
@@ -152,50 +142,38 @@ export default function Agenda() {
     return map;
   }, [consultas, year, month]);
 
+  const aConfirmar = consultas.filter((c) => c.status === "Aguardando" && new Date(c.data_hora) > new Date()).length;
+
   const dayConsultas = (consultasByDay.get(selectedDay) ?? []).sort(
     (a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime()
   );
 
   return (
     <DashboardLayout navItems={navItems}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="max-w-7xl mx-auto space-y-8">
+        <header className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6">
           <div>
-            <h1 className="text-2xl lg:text-[28px] font-bold text-foreground tracking-tight">Agenda de Atendimentos</h1>
-            <p className="text-sm text-muted-foreground mt-1">Gerencie suas consultas com inteligência e fluidez</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center bg-card border border-border/60 rounded-xl p-1 shadow-sm">
-              {(["Dia","Semana","Mês"] as ViewMode[]).map((mode) => (
-                <button key={mode} onClick={() => setViewMode(mode)} className={cn("px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-200", viewMode === mode ? "bg-primary text-primary-foreground shadow-[0_2px_8px_-2px_hsl(var(--primary)/0.4)]" : "text-muted-foreground hover:text-foreground")}>
-                  {mode}
-                </button>
-              ))}
-            </div>
-            <Button onClick={abrirNovaConsulta} className="rounded-xl gap-2 shadow-sm">
-              <Plus className="h-4 w-4" />
-              Nova Consulta
-            </Button>
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/8 via-primary/5 to-transparent p-5">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0"><Sparkles className="h-5 w-5 text-primary" /></div>
-            <div>
-              <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Resumo do Dia pela IA</p>
-              <p className="text-sm text-foreground leading-relaxed">
-                Você tem <span className="font-semibold">{dayConsultas.length} consultas</span> em {selectedDay} de {monthNames[month]}.
-                {dayConsultas.filter((c) => c.status === "Em andamento").length > 0 && " Há atendimento em andamento."}
+            <p className="eyebrow mb-3">Agenda</p>
+            <h1 className="font-display text-5xl leading-none text-foreground">
+              Seus <em>atendimentos</em>
+            </h1>
+            {aConfirmar > 0 && (
+              <p className="mt-3 text-[15px] text-muted-foreground">
+                <span className="font-mono text-warning">{String(aConfirmar).padStart(2, "0")}</span>{" "}
+                {aConfirmar === 1 ? "solicitação de paciente aguarda" : "solicitações de pacientes aguardam"} sua confirmação.
               </p>
-            </div>
+            )}
           </div>
-        </div>
+          <Button onClick={abrirNovaConsulta} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nova consulta
+          </Button>
+        </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6">
-          <div className="bg-card border border-border/50 rounded-2xl p-6 h-fit shadow-[0_2px_20px_-8px_rgba(0,0,0,0.06)]">
+          <div className="bg-card border border-border rounded-xl p-6 h-fit">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-base font-semibold text-foreground">{monthNames[month]} <span className="text-muted-foreground font-normal">{year}</span></h3>
+              <h3 className="font-display text-2xl text-foreground">{monthNames[month]} <span className="font-mono text-base text-muted-foreground">{year}</span></h3>
               <div className="flex items-center gap-1">
                 <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"><ChevronLeft className="h-4 w-4" /></button>
                 <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"><ChevronRight className="h-4 w-4" /></button>
@@ -211,7 +189,7 @@ export default function Agenda() {
                 const isSelected = day === selectedDay;
                 const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
                 return (
-                  <button key={idx} onClick={() => setSelectedDay(day)} className={cn("aspect-square rounded-xl flex flex-col items-center justify-center text-sm font-medium relative transition-all duration-200", isSelected ? "bg-primary text-primary-foreground shadow-[0_4px_12px_-4px_hsl(var(--primary)/0.5)]" : isToday ? "bg-primary/10 text-primary font-semibold" : "text-foreground hover:bg-muted")}>
+                  <button key={idx} onClick={() => setSelectedDay(day)} className={cn("aspect-square rounded-md flex flex-col items-center justify-center font-mono text-sm relative transition-colors", isSelected ? "bg-primary text-primary-foreground" : isToday ? "bg-primary/10 text-primary font-semibold" : "text-foreground hover:bg-muted")}>
                     {day}
                     {hasApts && <span className={cn("absolute bottom-1.5 w-1 h-1 rounded-full", isSelected ? "bg-primary-foreground" : "bg-primary")} />}
                   </button>
@@ -221,17 +199,18 @@ export default function Agenda() {
           </div>
 
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground px-1">
-              Dia {selectedDay}
-              <span className="text-sm text-muted-foreground font-normal ml-2">· {dayConsultas.length} {dayConsultas.length === 1 ? "consulta" : "consultas"}</span>
+            <h2 className="flex items-baseline gap-3 px-1">
+              <span className="font-display text-3xl text-foreground">{selectedDay} de {monthNames[month].toLowerCase()}</span>
+              <span className="font-mono text-xs text-muted-foreground">{dayConsultas.length} {dayConsultas.length === 1 ? "consulta" : "consultas"}</span>
             </h2>
 
             {isLoading ? (
               <div className="flex items-center justify-center py-16"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
             ) : dayConsultas.length === 0 ? (
-              <div className="bg-card border border-dashed border-border rounded-2xl p-12 text-center">
-                <CalendarDays className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">Nenhuma consulta agendada para este dia</p>
+              <div className="rounded-xl border border-border bg-card">
+                <EstadoVazio imagem={vazioAgenda} titulo={<>Nenhuma consulta <em className="text-primary">neste dia</em>.</>}>
+                  Use “Nova consulta” para agendar um paciente da sua lista.
+                </EstadoVazio>
               </div>
             ) : (
               <div className="relative pl-6">
@@ -242,36 +221,45 @@ export default function Agenda() {
                     return (
                       <div key={apt.id} className="relative">
                         <span className={cn("absolute -left-[22px] top-5 w-3.5 h-3.5 rounded-full border-2 border-card", isCurrent ? "bg-primary ring-4 ring-primary/20" : apt.status === "Finalizado" ? "bg-muted-foreground/40" : "bg-primary/40")} />
-                        <div className={cn("rounded-2xl border p-4 transition-all duration-200 hover:shadow-md", isCurrent ? "bg-primary/5 border-primary/30" : "bg-card border-border/50 shadow-[0_1px_8px_-4px_rgba(0,0,0,0.05)]")}>
+                        <div className={cn("rounded-lg border p-4 transition-colors", isCurrent ? "bg-secondary/60 border-primary/30" : "bg-card border-border", apt.status === "Cancelado" && "opacity-60")}>
                           <div className="flex items-start gap-4">
                             <div className="flex flex-col items-center min-w-[56px]">
-                              <span className={cn("text-[15px] font-bold tabular-nums", isCurrent ? "text-primary" : "text-foreground")}>{format(new Date(apt.data_hora), "HH:mm")}</span>
-                              <Clock className="h-3 w-3 text-muted-foreground/60 mt-1" />
+                              <span className={cn("font-mono text-lg tabular-nums", isCurrent ? "text-primary" : "text-foreground")}>{format(new Date(apt.data_hora), "HH:mm")}</span>
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-3 mb-1">
                                 <p className="text-[15px] font-semibold text-foreground truncate">{apt.paciente?.profile?.nome ?? "Paciente"}</p>
-                                <span className={cn("text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border whitespace-nowrap", statusStyles[apt.status as Status])}>{apt.status}</span>
+                                <StatusConsulta status={apt.status} />
                               </div>
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Stethoscope className="h-3 w-3" />{apt.tipo}</div>
-                              {(apt.status === "Aguardando" || apt.status === "Confirmado") && (
+                              {apt.status === "Aguardando" && (
                                 <div className="mt-3 flex items-center gap-2">
-                                  <button onClick={() => handleIniciarAtendimento(apt)} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all" title="Inicia o atendimento e abre o prontuário do paciente">
-                                    <PlayCircle className="h-3.5 w-3.5" />Iniciar Atendimento
-                                  </button>
-                                  <button onClick={() => updateStatus.mutateAsync({ id: apt.id, status: "Cancelado" })} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-all">
-                                    <X className="h-3 w-3" />Cancelar
-                                  </button>
+                                  <Button size="sm" className="h-8 gap-1.5" onClick={() => mudarStatus(apt, "Confirmado", "Consulta confirmada — o paciente foi avisado")}>
+                                    <Check className="h-3.5 w-3.5" />Confirmar
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-muted-foreground hover:text-destructive" onClick={() => mudarStatus(apt, "Cancelado", "Solicitação recusada — o paciente foi avisado")}>
+                                    <X className="h-3.5 w-3.5" />Recusar
+                                  </Button>
+                                </div>
+                              )}
+                              {apt.status === "Confirmado" && (
+                                <div className="mt-3 flex items-center gap-2">
+                                  <Button size="sm" className="h-8 gap-1.5" onClick={() => handleIniciarAtendimento(apt)} title="Inicia o atendimento e abre a anamnese">
+                                    <PlayCircle className="h-3.5 w-3.5" />Iniciar atendimento
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-muted-foreground hover:text-destructive" onClick={() => mudarStatus(apt, "Cancelado", "Consulta cancelada — o paciente foi avisado")}>
+                                    <X className="h-3.5 w-3.5" />Cancelar
+                                  </Button>
                                 </div>
                               )}
                               {isCurrent && (
                                 <div className="mt-3 flex items-center gap-2">
-                                  <button onClick={() => handleContinuarAtendimento(apt)} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all">
-                                    <Stethoscope className="h-3.5 w-3.5" />Abrir Prontuário
-                                  </button>
-                                  <button onClick={() => updateStatus.mutateAsync({ id: apt.id, status: "Finalizado" })} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-all">
-                                    Finalizar
-                                  </button>
+                                  <Button size="sm" className="h-8 gap-1.5" onClick={() => handleContinuarAtendimento(apt)}>
+                                    <Stethoscope className="h-3.5 w-3.5" />Continuar anamnese
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-8" onClick={() => mudarStatus(apt, "Finalizado", "Atendimento finalizado")}>
+                                    Finalizar sem anamnese
+                                  </Button>
                                 </div>
                               )}
                             </div>

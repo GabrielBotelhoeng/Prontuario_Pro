@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Home, FileText, FolderHeart, CalendarDays, Pill, ChevronRight, ShieldCheck, Copy, Stethoscope, History } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import DashboardLayout from "@/components/DashboardLayout";
+import { pacienteNavItems as navItems } from "@/lib/nav";
 import { usePrescricoesPaciente } from "@/hooks/usePrescricoes";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -17,14 +18,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Prescricao, MedicamentoItem } from "@/lib/database.types";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/paciente", icon: Home },
-  { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
-  { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
-  { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
-  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
-  { title: "Acessos", url: "/paciente/acessos", icon: History },
-];
 
 const tipoLabel: Record<string, string> = {
   simples: "Receita Simples",

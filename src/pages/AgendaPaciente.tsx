@@ -1,236 +1,340 @@
-import { useMemo, useState } from "react";
-import { Home, FileText, FolderHeart, CalendarDays, Stethoscope, Clock, Plus, Send, ShieldCheck, History } from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
-import { useConsultasPaciente, useSolicitarConsulta } from "@/hooks/useConsultas";
-import { useTodosMedicos } from "@/hooks/usePacientes";
-import { format } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
+import { addDays, format, isSameDay, isSunday, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Loader2, Send } from "lucide-react";
+import { toast } from "sonner";
+import DashboardLayout from "@/components/DashboardLayout";
+import { pacienteNavItems as navItems } from "@/lib/nav";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  useCancelarConsultaPaciente,
+  useConsultasPaciente,
+  useHorariosOcupados,
+  useSolicitarConsulta,
+} from "@/hooks/useConsultas";
+import { useTodosMedicos } from "@/hooks/usePacientes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusConsulta } from "@/components/clinico/StatusConsulta";
+import { EstadoVazio } from "@/components/clinico/EstadoVazio";
+import vazioAgenda from "@/assets/vazio/agenda.webp";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/paciente", icon: Home },
-  { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
-  { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
-  { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
-  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
-  { title: "Acessos", url: "/paciente/acessos", icon: History },
-];
+const TIPOS_CONSULTA = ["Consulta de rotina", "Retorno", "Primeira consulta"] as const;
 
-type Status = "Confirmado" | "Aguardando" | "Finalizado" | "Em andamento" | "Cancelado";
+/** Slots de 30 min, 08:00–17:30 (o banco recusa conflitos no mesmo intervalo). */
+const HORARIOS = Array.from({ length: 20 }, (_, i) => {
+  const h = 8 + Math.floor(i / 2);
+  return `${String(h).padStart(2, "0")}:${i % 2 ? "30" : "00"}`;
+});
 
-const statusStyles: Record<Status, string> = {
-  Confirmado: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  Aguardando: "bg-amber-50 text-amber-700 border-amber-200",
-  Finalizado: "bg-muted text-muted-foreground border-border",
-  "Em andamento": "bg-primary/10 text-primary border-primary/30",
-  Cancelado: "bg-red-50 text-red-600 border-red-200",
-};
-
-const TIPOS_CONSULTA = ["Consulta de Rotina", "Retorno", "Urgência"] as const;
-
-const HORARIOS: string[] = (() => {
-  const out: string[] = [];
-  for (let h = 8; h <= 18; h++) {
-    out.push(`${String(h).padStart(2, "0")}:00`);
-    if (h < 18) out.push(`${String(h).padStart(2, "0")}:30`);
+/** Próximos 14 dias úteis + sábado (sem domingos). */
+function proximosDias() {
+  const dias: Date[] = [];
+  let d = startOfDay(new Date());
+  while (dias.length < 14) {
+    if (!isSunday(d)) dias.push(d);
+    d = addDays(d, 1);
   }
-  return out;
-})();
-
-function hojeISO() {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return dias;
 }
 
 export default function AgendaPaciente() {
+  const { paciente } = useAuth();
   const { data: consultas = [], isLoading } = useConsultasPaciente();
   const { data: medicos = [] } = useTodosMedicos();
   const solicitar = useSolicitarConsulta();
-  const { toast } = useToast();
+  const cancelar = useCancelarConsultaPaciente();
 
+  const dias = useMemo(proximosDias, []);
   const [medicoId, setMedicoId] = useState("");
-  const [data, setData] = useState(hojeISO());
-  const [horario, setHorario] = useState(HORARIOS[0]);
+  const [dia, setDia] = useState<Date>(dias[0]);
+  const [horario, setHorario] = useState("");
   const [tipo, setTipo] = useState<string>(TIPOS_CONSULTA[0]);
   const [obs, setObs] = useState("");
+
+  // Pré-seleciona o médico responsável, quando houver.
+  useEffect(() => {
+    if (!medicoId && paciente?.medico_principal_id) setMedicoId(paciente.medico_principal_id);
+  }, [paciente?.medico_principal_id, medicoId]);
+
+  const diaISO = format(dia, "yyyy-MM-dd");
+  const { data: ocupados = [], isFetching: carregandoSlots } = useHorariosOcupados(medicoId, diaISO);
+
+  const slots = useMemo(() => {
+    const agora = new Date();
+    return HORARIOS.map((h) => {
+      const [hh, mm] = h.split(":").map(Number);
+      const inicio = new Date(dia);
+      inicio.setHours(hh, mm, 0, 0);
+      const ocupado = ocupados.some((o) => Math.abs(o.getTime() - inicio.getTime()) < 30 * 60 * 1000);
+      return { h, inicio, indisponivel: ocupado || inicio <= agora, ocupado };
+    });
+  }, [dia, ocupados]);
+
+  // Horário escolhido deixa de valer se o dia/médico mudar ou ele for ocupado.
+  useEffect(() => {
+    if (horario && slots.find((s) => s.h === horario)?.indisponivel) setHorario("");
+  }, [slots, horario]);
 
   const futuras = useMemo(
     () =>
       consultas
         .filter((c) => new Date(c.data_hora) >= new Date() && c.status !== "Cancelado" && c.status !== "Finalizado")
-        .sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime()),
+        .sort((a, b) => +new Date(a.data_hora) - +new Date(b.data_hora)),
     [consultas],
   );
-
   const passadas = useMemo(
     () =>
       consultas
         .filter((c) => new Date(c.data_hora) < new Date() || c.status === "Finalizado" || c.status === "Cancelado")
-        .sort((a, b) => new Date(b.data_hora).getTime() - new Date(a.data_hora).getTime())
+        .sort((a, b) => +new Date(b.data_hora) - +new Date(a.data_hora))
         .slice(0, 10),
     [consultas],
   );
 
   async function handleSolicitar() {
-    if (!medicoId) { toast({ title: "Selecione um médico", variant: "destructive" }); return; }
-    if (!data || !horario) { toast({ title: "Informe data e horário", variant: "destructive" }); return; }
+    const slot = slots.find((s) => s.h === horario);
+    if (!medicoId || !slot) return;
     try {
-      const dataHora = new Date(`${data}T${horario}:00`);
-      if (dataHora < new Date()) {
-        toast({ title: "Data inválida", description: "Escolha uma data e horário futuros.", variant: "destructive" });
-        return;
-      }
       await solicitar.mutateAsync({
         medico_id: medicoId,
-        data_hora: dataHora.toISOString(),
+        data_hora: slot.inicio.toISOString(),
         tipo,
         observacoes: obs.trim() || undefined,
       });
-      toast({ title: "Consulta solicitada", description: "Aguarde a confirmação do médico." });
-      setMedicoId("");
+      toast.success("Solicitação enviada", { description: "Você será avisado quando o médico confirmar." });
+      setHorario("");
       setObs("");
-    } catch (err: unknown) {
-      toast({ title: "Erro ao solicitar", description: (err as Error).message, variant: "destructive" });
+    } catch (err) {
+      toast.error("Não foi possível solicitar", { description: (err as Error).message });
     }
   }
 
+  async function handleCancelar(id: string) {
+    try {
+      await cancelar.mutateAsync(id);
+      toast.success("Consulta cancelada. O médico foi avisado.");
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
+  const medicoSel = medicos.find((m) => m.id === medicoId);
+
   return (
     <DashboardLayout navItems={navItems}>
-      <div className="max-w-4xl mx-auto space-y-8">
-        <div>
-          <p className="text-primary text-xs font-semibold tracking-widest uppercase mb-2">Saúde</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Meu Agendamento</h1>
-          <p className="text-sm text-muted-foreground mt-1">Consultas agendadas e histórico de atendimentos</p>
-        </div>
+      <div className="mx-auto max-w-6xl">
+        <header className="border-b border-border pb-8">
+          <p className="eyebrow mb-3">Agendamento</p>
+          <h1 className="font-display text-5xl leading-none text-foreground">
+            Marque sua <em>consulta</em>
+          </h1>
+          <p className="mt-3 max-w-xl text-[15px] text-muted-foreground">
+            Escolha o médico, o dia e um horário livre. A consulta fica confirmada depois que o médico aprovar.
+          </p>
+        </header>
 
-        {/* Solicitar Consulta */}
-        <section className="bg-card border border-border/40 rounded-2xl p-6" style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)" }}>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center"><Plus className="h-4 w-4 text-primary" /></div>
-            <div>
-              <h2 className="text-base font-semibold text-foreground">Solicitar Consulta</h2>
-              <p className="text-xs text-muted-foreground">Escolha o médico, dia e horário desejados</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Médico</Label>
+        <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_340px]">
+          {/* Solicitação */}
+          <section aria-label="Solicitar consulta" className="space-y-8">
+            <Passo n="01" titulo="Médico">
               <Select value={medicoId} onValueChange={setMedicoId}>
-                <SelectTrigger className="h-10 rounded-xl">
-                  <SelectValue placeholder="Selecionar médico..." />
+                <SelectTrigger className="h-11" aria-label="Médico">
+                  <SelectValue placeholder="Escolha o médico" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {medicos.length === 0 && <SelectItem value="_none" disabled>Nenhum médico disponível</SelectItem>}
+                <SelectContent>
                   {medicos.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.profile?.nome ?? "Médico"} — CRM {m.crm} · {m.especialidade}
+                      Dr(a). {m.profile?.nome ?? "—"} · {m.especialidade}
+                      {m.id === paciente?.medico_principal_id ? " · seu médico" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </Passo>
+
+            <Passo n="02" titulo="Dia">
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2" role="radiogroup" aria-label="Dia">
+                {dias.map((d) => {
+                  const ativo = isSameDay(d, dia);
+                  return (
+                    <button
+                      key={d.toISOString()}
+                      type="button"
+                      role="radio"
+                      aria-checked={ativo}
+                      onClick={() => setDia(d)}
+                      className={cn(
+                        "flex w-16 flex-shrink-0 flex-col items-center rounded-lg border py-2.5 transition-colors",
+                        ativo ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:border-foreground/30",
+                      )}
+                    >
+                      <span className={cn("text-[11px] uppercase", ativo ? "opacity-80" : "text-muted-foreground")}>
+                        {format(d, "EEE", { locale: ptBR }).replace(".", "")}
+                      </span>
+                      <span className="font-mono text-lg tabular-nums">{format(d, "dd")}</span>
+                      <span className={cn("text-[10px]", ativo ? "opacity-70" : "text-muted-foreground")}>
+                        {format(d, "MMM", { locale: ptBR }).replace(".", "")}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Passo>
+
+            <Passo n="03" titulo="Horário">
+              {!medicoId ? (
+                <p className="text-sm text-muted-foreground">Escolha o médico para ver os horários livres.</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-6" role="radiogroup" aria-label="Horário">
+                    {slots.map((s) => (
+                      <button
+                        key={s.h}
+                        type="button"
+                        role="radio"
+                        aria-checked={horario === s.h}
+                        disabled={s.indisponivel || carregandoSlots}
+                        onClick={() => setHorario(s.h)}
+                        title={s.ocupado ? "Horário ocupado" : undefined}
+                        className={cn(
+                          "rounded-md border py-2 font-mono text-sm tabular-nums transition-colors",
+                          horario === s.h
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card hover:border-primary/50",
+                          "disabled:cursor-not-allowed disabled:border-transparent disabled:bg-muted/50 disabled:text-muted-foreground/50",
+                          s.ocupado && "disabled:line-through",
+                        )}
+                      >
+                        {s.h}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {carregandoSlots ? "Atualizando horários…" : "Horários riscados já estão ocupados."}
+                  </p>
+                </>
+              )}
+            </Passo>
+
+            <Passo n="04" titulo="Detalhes">
+              <div className="grid gap-3 sm:grid-cols-[200px_minmax(0,1fr)]">
+                <Select value={tipo} onValueChange={setTipo}>
+                  <SelectTrigger aria-label="Tipo de consulta">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_CONSULTA.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Textarea
+                  value={obs}
+                  onChange={(e) => setObs(e.target.value)}
+                  placeholder="Motivo da consulta (opcional)"
+                  className="min-h-[44px] resize-y"
+                  aria-label="Motivo da consulta"
+                />
+              </div>
+            </Passo>
+
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-secondary/60 px-5 py-4">
+              <p className="text-sm text-foreground">
+                {medicoSel && horario ? (
+                  <>
+                    <span className="font-mono">{format(dia, "dd/MM")} · {horario}</span> com Dr(a). {medicoSel.profile?.nome}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">Escolha médico, dia e horário.</span>
+                )}
+              </p>
+              <Button onClick={handleSolicitar} disabled={!medicoId || !horario || solicitar.isPending} className="gap-2">
+                {solicitar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Solicitar consulta
+              </Button>
             </div>
+          </section>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data</Label>
-              <Input type="date" value={data} min={hojeISO()} onChange={(e) => setData(e.target.value)} className="h-10 rounded-xl" />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Horário</Label>
-              <Select value={horario} onValueChange={setHorario}>
-                <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
-                <SelectContent className="rounded-xl max-h-72">
-                  {HORARIOS.map((h) => (<SelectItem key={h} value={h}>{h}</SelectItem>))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tipo</Label>
-              <Select value={tipo} onValueChange={setTipo}>
-                <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {TIPOS_CONSULTA.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Observações <span className="normal-case text-muted-foreground/70">(opcional)</span></Label>
-              <Textarea value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Conte ao médico o motivo da consulta..." className="min-h-[70px] rounded-xl resize-none" />
-            </div>
-          </div>
-
-          <div className="flex justify-end mt-4">
-            <Button onClick={handleSolicitar} disabled={solicitar.isPending} className="rounded-xl gap-2">
-              {solicitar.isPending && <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />}
-              <Send className="h-4 w-4" />
-              {solicitar.isPending ? "Enviando..." : "Solicitar Consulta"}
-            </Button>
-          </div>
-        </section>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
-        ) : (
-          <>
-            <section>
-              <h2 className="text-foreground text-lg font-semibold tracking-tight mb-4">Próximas Consultas</h2>
-              {futuras.length === 0 ? (
-                <div className="bg-card border border-dashed border-border rounded-2xl p-12 text-center">
-                  <CalendarDays className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">Nenhuma consulta agendada</p>
+          {/* Minhas consultas */}
+          <aside className="space-y-10">
+            <section aria-labelledby="proximas-titulo">
+              <h2 id="proximas-titulo" className="eyebrow mb-4">
+                Próximas consultas
+              </h2>
+              {isLoading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : futuras.length === 0 ? (
+                <div className="rounded-xl border border-border bg-card">
+                  <EstadoVazio imagem={vazioAgenda} titulo="Nada marcado." className="!flex-col !py-6 !text-center sm:!text-center">
+                    Sua próxima consulta aparece aqui.
+                  </EstadoVazio>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <ul className="space-y-2">
                   {futuras.map((c) => (
-                    <div key={c.id} className="bg-card border border-border/40 rounded-2xl p-5 flex items-center gap-5 hover:shadow-md transition-all" style={{ boxShadow: "0 1px 12px -4px rgba(0,0,0,0.05)" }}>
-                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0"><CalendarDays className="h-5 w-5 text-primary" /></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-foreground font-semibold text-[15px]">{c.medico?.profile?.nome ?? "Médico"}</p>
-                          <span className={cn("text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border", statusStyles[c.status as Status])}>{c.status}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground"><Stethoscope className="h-3.5 w-3.5" />{c.tipo}</div>
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5"><Clock className="h-3.5 w-3.5" />{format(new Date(c.data_hora), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}</div>
+                    <li key={c.id} className="rounded-lg border border-border bg-card p-4">
+                      <p className="font-mono text-lg tabular-nums text-foreground">
+                        {format(new Date(c.data_hora), "dd/MM · HH:mm")}
+                      </p>
+                      <p className="truncate text-sm text-foreground">Dr(a). {c.medico?.profile?.nome ?? "—"}</p>
+                      <p className="truncate text-xs text-muted-foreground">{c.tipo}</p>
+                      <div className="mt-3 flex items-center justify-between">
+                        <StatusConsulta status={c.status} />
+                        <button
+                          onClick={() => handleCancelar(c.id)}
+                          disabled={cancelar.isPending}
+                          className="text-xs text-muted-foreground underline-offset-4 hover:text-destructive hover:underline"
+                        >
+                          Cancelar
+                        </button>
                       </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
             </section>
 
             {passadas.length > 0 && (
-              <section>
-                <h2 className="text-foreground text-lg font-semibold tracking-tight mb-4">Histórico</h2>
-                <div className="space-y-3">
+              <section aria-labelledby="passadas-titulo">
+                <h2 id="passadas-titulo" className="eyebrow mb-4">
+                  Histórico
+                </h2>
+                <ul className="divide-y divide-border border-y border-border">
                   {passadas.map((c) => (
-                    <div key={c.id} className="bg-card border border-border/40 rounded-2xl p-5 flex items-center gap-5 opacity-75 hover:opacity-100 transition-all" style={{ boxShadow: "0 1px 12px -4px rgba(0,0,0,0.05)" }}>
-                      <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0"><CalendarDays className="h-5 w-5 text-muted-foreground" /></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-foreground font-semibold text-[15px]">{c.medico?.profile?.nome ?? "Médico"}</p>
-                          <span className={cn("text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border", statusStyles[c.status as Status])}>{c.status}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground"><Stethoscope className="h-3.5 w-3.5" />{c.tipo}</div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5"><Clock className="h-3.5 w-3.5" />{format(new Date(c.data_hora), "dd/MM/yyyy 'às' HH:mm")}</div>
+                    <li key={c.id} className="flex items-center justify-between gap-3 py-3">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                          {format(new Date(c.data_hora), "dd/MM/yyyy · HH:mm")}
+                        </p>
+                        <p className="truncate text-sm text-foreground">Dr(a). {c.medico?.profile?.nome ?? "—"}</p>
                       </div>
-                    </div>
+                      <StatusConsulta status={c.status} />
+                    </li>
                   ))}
-                </div>
+                </ul>
               </section>
             )}
-          </>
-        )}
+          </aside>
+        </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+function Passo({ n, titulo, children }: { n: string; titulo: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-[3rem_minmax(0,1fr)]">
+      <span className="font-mono text-sm text-muted-foreground md:pt-0.5">{n}</span>
+      <div>
+        <h3 className="mb-3 text-lg font-medium text-foreground">{titulo}</h3>
+        {children}
+      </div>
+    </div>
   );
 }

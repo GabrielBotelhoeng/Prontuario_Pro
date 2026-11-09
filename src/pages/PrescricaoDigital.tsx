@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
 import {
   Home, FileText, ClipboardList, CalendarDays, BarChart3,
-  Plus, Download, Printer, Save, MessageCircle, Sparkles,
+  Plus, Download, Printer, Save, MessageCircle, BookOpen,
   AlertTriangle, Pill, QrCode, Trash2, FolderOpen,
 } from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import DashboardLayout from "@/components/DashboardLayout";
+import { medicoNavItems as navItems } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,15 +19,6 @@ import { usePacientesDoMedico, useVincularPaciente } from "@/hooks/usePacientes"
 import { useToast } from "@/hooks/use-toast";
 import { BrandMark } from "@/components/Brand";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/medico", icon: Home },
-  { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
-  { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
-  { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
-  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
-  { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
-  { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
-];
 
 interface Medication {
   id: string;
@@ -241,15 +233,15 @@ export default function PrescricaoDigital() {
             {aiHint && (
               <div className={cn("rounded-xl p-4 border animate-in fade-in slide-in-from-bottom-2 duration-300", "bg-primary/5 border-primary/20")}>
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center flex-shrink-0 shadow-sm">
-                    {aiHint.type === "warning" ? <AlertTriangle className="h-4 w-4 text-primary-foreground" /> : <Sparkles className="h-4 w-4 text-primary-foreground" />}
+                  <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
+                    {aiHint.type === "warning" ? <AlertTriangle className="h-4 w-4 text-warning" /> : <BookOpen className="h-4 w-4 text-primary" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">Assistente de IA</p>
+                    <p className="eyebrow mb-1">Posologia de referência</p>
                     <p className="text-sm text-foreground/80 leading-relaxed">{aiHint.message}</p>
                     {aiHint.posology && (
                       <button onClick={applyAiPosology} className="mt-2 text-xs font-semibold text-primary hover:text-primary/80 transition-colors inline-flex items-center gap-1">
-                        <Sparkles className="h-3 w-3" />Sugerir posologia comum
+                        Usar posologia de referência
                       </button>
                     )}
                   </div>

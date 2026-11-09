@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Home, FileText, FolderHeart, CalendarDays, ClipboardList, Activity, Stethoscope, Paperclip, Download, Trash2, Upload, Pencil, X as XIcon, ShieldCheck, History, PlusCircle, Sparkles, Info } from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import DashboardLayout from "@/components/DashboardLayout";
+import { pacienteNavItems as navItems } from "@/lib/nav";
 import MedicoResponsavelBanner from "@/components/MedicoResponsavelBanner";
 import { useAnamnesesPaciente } from "@/hooks/useAnamneses";
+import { EstadoVazio } from "@/components/clinico/EstadoVazio";
+import vazioProntuario from "@/assets/vazio/prontuario.webp";
 import { usePrescricoesPaciente } from "@/hooks/usePrescricoes";
 import { useDocumentosPaciente, useUploadDocumento, useDeleteDocumento, downloadDocumento, validarArquivo } from "@/hooks/useDocumentos";
 import { useConsultasPaciente } from "@/hooks/useConsultas";
@@ -21,14 +24,6 @@ import { supabase } from "@/lib/supabase";
 
 const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/paciente", icon: Home },
-  { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
-  { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
-  { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
-  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
-  { title: "Acessos", url: "/paciente/acessos", icon: History },
-];
 
 export default function MeuProntuario() {
   const { profile, paciente, user, refreshUserData } = useAuth();
@@ -213,7 +208,7 @@ export default function MeuProntuario() {
             <div className={`rounded-2xl border border-border/40 ${c.bg} px-5 py-4`}>
               <div className="flex items-start gap-3">
                 <div className={`w-9 h-9 rounded-xl bg-white/70 flex items-center justify-center flex-shrink-0 ${c.text}`}>
-                  <Sparkles className="h-4 w-4" />
+                  <ClipboardList className="h-4 w-4" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between gap-3 mb-2">
@@ -301,8 +296,10 @@ export default function MeuProntuario() {
                 <h2 className="text-lg font-semibold text-foreground">Histórico de Consultas</h2>
               </div>
               {anamneses.length === 0 ? (
-                <div className="bg-card border border-dashed border-border rounded-2xl p-10 text-center">
-                  <p className="text-sm text-muted-foreground">Nenhum histórico de consulta disponível</p>
+                <div className="rounded-xl border border-border bg-card">
+                  <EstadoVazio imagem={vazioProntuario} titulo={<>Seu prontuário <em className="text-primary">começa aqui</em>.</>}>
+                    Depois de cada consulta, o registro do seu médico aparece nesta página.
+                  </EstadoVazio>
                 </div>
               ) : (
                 <div className="space-y-3">

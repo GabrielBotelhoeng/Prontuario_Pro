@@ -17,7 +17,8 @@ import {
   FileClock,
   FolderOpen,
 } from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import DashboardLayout from "@/components/DashboardLayout";
+import { medicoNavItems as navItems } from "@/lib/nav";
 import { Card } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -41,15 +42,6 @@ const PALETA = [
   "hsl(var(--destructive))",
 ];
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/medico", icon: Home },
-  { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
-  { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
-  { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
-  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
-  { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
-  { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
-];
 
 interface MetricItem {
   label: string;
@@ -186,17 +178,17 @@ export default function PainelMonitoramento() {
   }, [diagnosticData]);
 
   return (
-    <DashboardLayout navItems={navItems} userName="Dr. Carlos" userRole="Médico">
+    <DashboardLayout navItems={navItems}>
       <div className="max-w-[1400px] mx-auto space-y-6 animate-in fade-in duration-500">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-              Monitoramento Inteligente
-              <Sparkles className="h-5 w-5 text-primary" />
+            <p className="eyebrow mb-3">Indicadores</p>
+            <h1 className="font-display text-5xl leading-none text-foreground">
+              Monitoramento <em>clínico</em>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Análise clínica e financeira com insights de IA
+            <p className="mt-3 text-[15px] text-muted-foreground">
+              Volume de atendimentos e perfil dos seus pacientes no mês.
             </p>
           </div>
         </div>
@@ -274,11 +266,8 @@ export default function PainelMonitoramento() {
               </div>
             )}
 
-            <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-primary/8 to-primary/4 border border-primary/15">
+            <div className="mt-6 rounded-lg border-l-2 border-primary bg-secondary/50 p-4">
               <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                </div>
                 <div>
                   <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Resumo</p>
                   <p className="text-sm text-foreground/80 leading-relaxed">
