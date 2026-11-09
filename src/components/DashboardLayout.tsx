@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { BrandLockup, BrandMark } from "@/components/Brand";
+import AvisoInatividade from "@/components/AvisoInatividade";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -285,6 +286,7 @@ export default function DashboardLayout({
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar items={navItems} onLogout={handleLogout} />
+        <AvisoInatividade />
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}

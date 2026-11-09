@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 const ACAO_LABEL: Record<string, string> = {
   login_sucesso: "Login",
   login_falha: "Falha de login",
+  login_bloqueado: "Teve o acesso bloqueado",
   prontuario_visualizado: "Visualizou prontuário",
   prescricao_criada: "Emitiu prescrição",
   prescricao_visualizada: "Visualizou prescrição",
