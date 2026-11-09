@@ -38,3 +38,10 @@ FASE2_PRONTUARIO.md
 .windsurf/rules
 .vercel
 .env*
+
+# Testes E2E: cópias geradas por e2e/scripts/db.mjs e estado local da CLI
+e2e/supabase/migrations/
+e2e/supabase/functions/
+e2e/supabase/.temp/
+e2e/supabase/.branches/
+e2e/relatorios/
