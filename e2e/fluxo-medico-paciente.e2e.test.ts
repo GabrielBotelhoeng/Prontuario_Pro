@@ -613,3 +613,45 @@ describe("13. Notificações e LGPD do paciente", () => {
     expect(data).toBeTruthy();
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+describe("14. Proteção do login", () => {
+  it("[Atacante] 5 senhas erradas no CRM do Dr. Otávio bloqueiam o acesso, até com a senha certa", async () => {
+    // Login correto zera o contador (falhas de etapas anteriores não contam).
+    await new Agente("Dr. Otávio", "medico").entrar(cred.medicoIntruso.crm.mascarado, cred.medicoIntruso.senha);
+    for (let i = 0; i < 5; i++) {
+      await expect(new Agente("Atacante", "medico").entrar(cred.medicoIntruso.crm.mascarado, `errada-${i}`)).rejects.toThrow(
+        /Credenciais inválidas/,
+      );
+    }
+    await expect(
+      new Agente("Atacante", "medico").entrar(cred.medicoIntruso.crm.mascarado, cred.medicoIntruso.senha),
+    ).rejects.toThrow(/Muitas tentativas/);
+  });
+
+  it("[Atacante] CPF sem cadastro também é bloqueado (não revela quem é paciente)", async () => {
+    const cpf = gerarCPF().mascarado;
+    for (let i = 0; i < 5; i++) {
+      await expect(new Agente("Atacante", "paciente").entrar(cpf, "x")).rejects.toThrow(/Credenciais inválidas/);
+    }
+    await expect(new Agente("Atacante", "paciente").entrar(cpf, "x")).rejects.toThrow(/Muitas tentativas/);
+  });
+
+  it("[Paciente] continua entrando normalmente (o bloqueio é por documento)", async () => {
+    const joao = new Agente(paciente.nome, "paciente");
+    await joao.entrar(cred.paciente.cpf.mascarado, cred.paciente.senha);
+    expect(joao.id).toBe(paciente.id);
+  });
+
+  it("[Admin] a auditoria registra as falhas e o bloqueio do Dr. Otávio", async () => {
+    const { data, error } = await admin.cliente
+      .from("audit_logs")
+      .select("action")
+      .eq("target_user_id", medicoIntruso.id)
+      .in("action", ["login_falha", "login_bloqueado"]);
+    expect(error).toBeNull();
+    const acoes = (data ?? []).map((a) => a.action);
+    expect(acoes).toContain("login_bloqueado");
+    expect(acoes.filter((a) => a === "login_falha").length).toBeGreaterThanOrEqual(4);
+  });
+});

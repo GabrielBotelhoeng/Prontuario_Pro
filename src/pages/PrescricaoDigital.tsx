@@ -132,7 +132,7 @@ export default function PrescricaoDigital() {
           <div>
             <p className="text-primary text-xs font-semibold tracking-widest uppercase mb-2">Atendimento</p>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Prescrição Digital</h1>
-            <p className="text-sm text-muted-foreground mt-1">Crie receitas com assistência inteligente e assinatura digital.</p>
+            <p className="text-sm text-muted-foreground mt-1">Receita digital com QR Code para conferência pela farmácia.</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={salvarRascunho} disabled={salvando} className="rounded-xl gap-2">
@@ -324,7 +324,7 @@ export default function PrescricaoDigital() {
                       <p className="text-sm font-semibold text-foreground">{profile?.nome}</p>
                     </div>
                     <p className="text-[11px] text-muted-foreground">CRM {medico?.crm} · {medico?.especialidade}</p>
-                    <p className="text-[10px] text-primary font-semibold mt-2 uppercase tracking-widest">Assinado digitalmente</p>
+                    <p className="text-[10px] text-muted-foreground mt-2 leading-snug max-w-[260px]">Conferível pelo QR Code. Sem assinatura ICP-Brasil: receitas de controle especial precisam ser impressas e assinadas.</p>
                   </div>
                   <div className="flex flex-col items-center gap-1">
                     <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-foreground/[0.04] to-primary/10 border border-border/60 flex items-center justify-center">

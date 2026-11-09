@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { useAuth, type LoginTipo } from "@/contexts/AuthContext";
 import { maskCPF, maskCRM } from "@/lib/masks";
@@ -62,6 +62,8 @@ const Index = () => {
   const [erro, setErro] = useState("");
   const { signIn, profile, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const expirouPorInatividade = (location.state as { motivo?: string } | null)?.motivo === "inatividade";
 
   // Já autenticado (ou login acabou de concluir): segue para a área correta.
   useEffect(() => {
@@ -129,6 +131,11 @@ const Index = () => {
         {saudacao()}<em>.</em>
       </h2>
       <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">{cfg.subtitulo}</p>
+      {expirouPorInatividade && (
+        <p role="status" className="mt-5 rounded-lg border-l-2 border-warning bg-warning/10 px-4 py-3 text-sm text-foreground">
+          Sua sessão foi encerrada após 15 minutos sem uso. Entre novamente para continuar.
+        </p>
+      )}
 
       {isAdmin ? (
         <button

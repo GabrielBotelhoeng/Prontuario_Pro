@@ -21,6 +21,7 @@ const ACTION_LABEL: Record<string, string> = {
   consentimento_revogado: "Consentimento revogado",
   login_sucesso: "Login realizado",
   login_falha: "Tentativa de login",
+  login_bloqueado: "Acesso bloqueado após tentativas",
 };
 
 const ACTION_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -36,6 +37,7 @@ const ACTION_ICON: Record<string, React.ComponentType<{ className?: string }>> =
   consentimento_revogado: ShieldCheck,
   login_sucesso: LogIn,
   login_falha: AlertCircle,
+  login_bloqueado: AlertCircle,
 };
 
 function actorIcon(tipo: AuditLogRow["actor_tipo"]) {
