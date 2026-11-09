@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Home, FileText, FolderHeart, CalendarDays, ShieldCheck, History, FileCheck2, FileX2, AlertTriangle } from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import DashboardLayout from "@/components/DashboardLayout";
+import { pacienteNavItems as navItems } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -31,14 +32,6 @@ import type { ConsentimentoTipo } from "@/lib/database.types";
 
 const CONFIRMACAO_ENCERRAMENTO = "ENCERRAR";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/paciente", icon: Home },
-  { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
-  { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
-  { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
-  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
-  { title: "Acessos", url: "/paciente/acessos", icon: History },
-];
 
 interface TermoConfig {
   tipo: ConsentimentoTipo;

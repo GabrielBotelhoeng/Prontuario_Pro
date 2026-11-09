@@ -21,7 +21,8 @@ import {
   CheckCircle2,
   FolderOpen,
 } from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import DashboardLayout from "@/components/DashboardLayout";
+import { medicoNavItems as navItems } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -42,15 +43,6 @@ import {
   Cell,
 } from "recharts";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/medico", icon: Home },
-  { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
-  { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
-  { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
-  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
-  { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
-  { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
-];
 
 type ChatMsg = { role: "user" | "ai"; content: string };
 
@@ -194,8 +186,6 @@ export default function PainelIA() {
   return (
     <DashboardLayout
       navItems={navItems}
-      userName="Dr. Carlos"
-      userRole="Clínica Geral"
     >
       <div
         className="max-w-7xl mx-auto space-y-6 -m-4 lg:-m-8 p-4 lg:p-8 min-h-[calc(100vh-4rem)]"

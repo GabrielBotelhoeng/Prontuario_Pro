@@ -1,807 +1,531 @@
-import { useMemo, useState, useRef, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import type { LucideIcon } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { differenceInYears, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { CheckCircle2, Loader2, Plus, Search, UserPlus, X } from "lucide-react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { medicoNavItems as navItems } from "@/lib/nav";
 import { useSalvarAnamnese } from "@/hooks/useAnamneses";
 import { usePacientesDoMedico, useVincularPaciente } from "@/hooks/usePacientes";
-import { useConsultasMedico } from "@/hooks/useConsultas";
-import { useDocumentosPacienteMedico, useUploadDocumento, useDeleteDocumento, downloadDocumento, validarArquivo } from "@/hooks/useDocumentos";
-import { DOCUMENTO_CATEGORIA_LABEL } from "@/lib/database.types";
-import { format as formatDate } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { useConsultasMedico, useUpdateConsultaStatus } from "@/hooks/useConsultas";
 import { logAuditEvent } from "@/hooks/useAuditLogs";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Home,
-  FileText,
-  ClipboardList,
-  CalendarDays,
-  BarChart3,
-  Brain,
-  Sparkles,
-  Search,
-  Save,
-  Printer,
-  FileSignature,
-  Activity,
-  HeartPulse,
-  Thermometer,
-  Scale,
-  Stethoscope,
-  Droplet,
-  IdCard,
-  CalendarRange,
-  UserSquare2,
-  Plus,
-  Paperclip,
-  Download,
-  Trash2,
-  Upload,
-  FolderOpen,
-} from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import { buscarCid } from "@/lib/cid10";
+import { maskCPF } from "@/lib/masks";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EstadoVazio } from "@/components/clinico/EstadoVazio";
+import { HistoricoPaciente } from "@/components/clinico/HistoricoPaciente";
+import { DocumentosPacientePanel } from "@/components/clinico/DocumentosPacientePanel";
+import vazioAnamnese from "@/assets/vazio/anamnese.webp";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/medico", icon: Home },
-  { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
-  { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
-  { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
-  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
-  { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
-  { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
+const PATOLOGIAS = [
+  "Hipertensão",
+  "Diabetes",
+  "Dislipidemia",
+  "Asma",
+  "DPOC",
+  "Cardiopatia",
+  "Doença renal",
+  "Tireoide",
+  "Depressão",
+  "Ansiedade",
+  "Obesidade",
+  "Tabagismo",
 ];
 
-// Simulação simples de mapeamento queixa -> CID
-const cidDictionary: { keywords: string[]; code: string; label: string }[] = [
-  { keywords: ["dor de cabeça", "cefaleia", "enxaqueca"], code: "R51", label: "Cefaleia" },
-  { keywords: ["febre", "temperatura alta"], code: "R50.9", label: "Febre não especificada" },
-  { keywords: ["tosse"], code: "R05", label: "Tosse" },
-  { keywords: ["pressão alta", "hipertensão"], code: "I10", label: "Hipertensão essencial" },
-  { keywords: ["ansiedade", "ansioso"], code: "F41.1", label: "Ansiedade generalizada" },
-  { keywords: ["insônia", "não consigo dormir", "dificuldade para dormir"], code: "G47.0", label: "Distúrbios do sono" },
-  { keywords: ["dor lombar", "dor nas costas", "lombalgia"], code: "M54.5", label: "Dor lombar baixa" },
-  { keywords: ["náusea", "enjoo", "vômito"], code: "R11", label: "Náusea e vômito" },
-  { keywords: ["diabetes", "glicemia"], code: "E11", label: "Diabetes mellitus tipo 2" },
-];
-
-interface Pathology {
-  id: string;
-  label: string;
-  active: boolean;
+interface Vitais {
+  pressao: string;
+  fc: string;
+  fr: string;
+  temp: string;
+  spo2: string;
+  peso: string;
+  altura: string;
 }
 
+const SINAIS: { chave: keyof Vitais; rotulo: string; unidade: string; placeholder: string }[] = [
+  { chave: "pressao", rotulo: "PA", unidade: "mmHg", placeholder: "120/80" },
+  { chave: "fc", rotulo: "FC", unidade: "bpm", placeholder: "72" },
+  { chave: "fr", rotulo: "FR", unidade: "irpm", placeholder: "16" },
+  { chave: "temp", rotulo: "Temp.", unidade: "°C", placeholder: "36,5" },
+  { chave: "spo2", rotulo: "SpO₂", unidade: "%", placeholder: "98" },
+  { chave: "peso", rotulo: "Peso", unidade: "kg", placeholder: "70" },
+  { chave: "altura", rotulo: "Altura", unidade: "cm", placeholder: "170" },
+];
+
+interface Formulario {
+  queixa_principal: string;
+  historia_doenca: string;
+  antecedentes_pessoais: string;
+  antecedentes_familiares: string;
+  medicamentos_uso: string;
+  alergias: string;
+  exame_fisico: string;
+  hipotese_diagnostica: string;
+  conduta: string;
+}
+
+const FORM_VAZIO: Formulario = {
+  queixa_principal: "",
+  historia_doenca: "",
+  antecedentes_pessoais: "",
+  antecedentes_familiares: "",
+  medicamentos_uso: "",
+  alergias: "",
+  exame_fisico: "",
+  hipotese_diagnostica: "",
+  conduta: "",
+};
+
+const VITAIS_VAZIO: Vitais = { pressao: "", fc: "", fr: "", temp: "", spo2: "", peso: "", altura: "" };
+
+const textareaClass = "min-h-[92px] resize-y bg-background text-[15px] leading-relaxed";
+
 export default function Anamnese() {
-  const { profile, user } = useAuth();
-  const { data: pacientes = [] } = usePacientesDoMedico();
-  const { data: consultasMedico = [] } = useConsultasMedico();
-  const vincularPaciente = useVincularPaciente();
-  const salvarAnamnese = useSalvarAnamnese();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { data: pacientes = [], isLoading: carregandoPacientes } = usePacientesDoMedico();
+  const { data: consultas = [] } = useConsultasMedico();
+  const vincular = useVincularPaciente();
+  const salvar = useSalvarAnamnese();
+  const atualizarConsulta = useUpdateConsultaStatus();
 
-  const [pacienteId, setPacienteId] = useState("");
-  const [cpfVincular, setCpfVincular] = useState("");
+  const consultaId = searchParams.get("consultaId");
+  const consulta = useMemo(() => consultas.find((c) => c.id === consultaId) ?? null, [consultas, consultaId]);
 
-  // H1 (visibilidade do status) + H6 (reconhecer vs lembrar):
-  // ao chegar via "Iniciar atendimento" da agenda, pré-seleciona o paciente
-  // e exibe banner contextualizando que há consulta em andamento.
-  const consultaIdParam = searchParams.get("consultaId");
-  const pacienteIdParam = searchParams.get("pacienteId");
-  const consultaAtual = useMemo(
-    () => consultasMedico.find((c) => c.id === consultaIdParam) ?? null,
-    [consultasMedico, consultaIdParam],
-  );
+  const [pacienteId, setPacienteId] = useState(searchParams.get("pacienteId") ?? "");
+  const [form, setForm] = useState<Formulario>(FORM_VAZIO);
+  const [vitais, setVitais] = useState<Vitais>(VITAIS_VAZIO);
+  const [patologias, setPatologias] = useState<string[]>([]);
+  const [cidBusca, setCidBusca] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [mostrarVincular, setMostrarVincular] = useState(false);
+  const [salvando, setSalvando] = useState<"" | "salvar" | "finalizar">("");
 
+  const paciente = pacientes.find((p) => p.id === pacienteId);
+  const cids = useMemo(() => buscarCid(cidBusca), [cidBusca]);
+
+  // Chegada pela agenda: o paciente vem na URL.
   useEffect(() => {
-    if (pacienteIdParam && pacienteIdParam !== pacienteId) {
-      setPacienteId(pacienteIdParam);
-    }
-    // intencionalmente só observa o param; setPacienteId só roda na chegada
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pacienteIdParam]);
+    const p = searchParams.get("pacienteId");
+    if (p) setPacienteId(p);
+  }, [searchParams]);
 
-  // Registra prontuario_visualizado uma vez por seleção de paciente.
-  // Mudanças de re-render não disparam novo log (ref persiste); apenas
-  // trocar para outro paciente registra novo evento.
-  const ultimoVisualizadoRef = useRef<string | null>(null);
+  // Trocar de paciente limpa o formulário e registra o acesso ao prontuário (LGPD).
+  const ultimoLog = useRef<string | null>(null);
   useEffect(() => {
-    if (pacienteId && ultimoVisualizadoRef.current !== pacienteId) {
-      ultimoVisualizadoRef.current = pacienteId;
-      logAuditEvent({
-        action: "prontuario_visualizado",
-        resourceType: "paciente",
-        resourceId: pacienteId,
-        targetUserId: pacienteId,
-      });
+    setForm(FORM_VAZIO);
+    setVitais(VITAIS_VAZIO);
+    setPatologias([]);
+    setCidBusca("");
+    if (pacienteId && ultimoLog.current !== pacienteId) {
+      ultimoLog.current = pacienteId;
+      logAuditEvent({ action: "prontuario_visualizado", resourceType: "paciente", resourceId: pacienteId, targetUserId: pacienteId });
     }
   }, [pacienteId]);
 
+  const set = (campo: keyof Formulario) => (e: React.ChangeEvent<HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [campo]: e.target.value }));
+
+  function adicionarCid(codigo: string, descricao: string) {
+    setForm((f) => ({
+      ...f,
+      hipotese_diagnostica: [f.hipotese_diagnostica.trim(), `${codigo} — ${descricao}`].filter(Boolean).join("\n"),
+    }));
+    setCidBusca("");
+  }
+
   async function handleVincular() {
-    // H5 (prevenção de erros): aceita CPF com ou sem pontuação.
-    const cpfLimpo = cpfVincular.replace(/\D/g, "");
-    if (!cpfLimpo) {
-      toast({ title: "Informe um CPF", description: "Digite o CPF do paciente para localizá-lo.", variant: "destructive" });
-      return;
-    }
-    if (cpfLimpo.length !== 11) {
-      toast({
-        title: "CPF inválido",
-        description: `O CPF deve ter 11 dígitos — você digitou ${cpfLimpo.length}.`,
-        variant: "destructive",
-      });
+    const digitos = cpf.replace(/\D/g, "");
+    if (digitos.length !== 11) {
+      toast({ title: "CPF incompleto", description: "Informe os 11 dígitos do CPF.", variant: "destructive" });
       return;
     }
     try {
-      const p = await vincularPaciente.mutateAsync(cpfLimpo);
-      if (!p || !p.id) {
-        // H9 (recuperação de erros): mensagem clara em vez de toast genérico.
-        toast({
-          title: "Paciente não encontrado",
-          description: "Verifique o CPF — ainda não há um paciente cadastrado com esse número no sistema.",
-          variant: "destructive",
-        });
+      const p = await vincular.mutateAsync(digitos);
+      setPacienteId(p.id);
+      setCpf("");
+      setMostrarVincular(false);
+      toast({ title: `${p.nome} agora está na sua lista` });
+    } catch (err) {
+      toast({ title: "Não foi possível vincular", description: (err as Error).message, variant: "destructive" });
+    }
+  }
+
+  function sairDaConsulta() {
+    searchParams.delete("consultaId");
+    searchParams.delete("pacienteId");
+    setSearchParams(searchParams);
+  }
+
+  async function handleSalvar(finalizar: boolean) {
+    if (!pacienteId) return;
+    if (!form.queixa_principal.trim()) {
+      toast({ title: "Informe a queixa principal", variant: "destructive" });
+      document.getElementById("queixa_principal")?.focus();
+      return;
+    }
+    setSalvando(finalizar ? "finalizar" : "salvar");
+    try {
+      const sinais = Object.fromEntries(Object.entries(vitais).filter(([, v]) => v.trim()));
+      await salvar.mutateAsync({
+        paciente_id: pacienteId,
+        ...Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim() || undefined])),
+        sinais_vitais: sinais,
+        patologias,
+        consulta_id: consulta?.id,
+      });
+
+      if (finalizar && consulta) {
+        await atualizarConsulta.mutateAsync({ id: consulta.id, status: "Finalizado" });
+        toast({ title: "Atendimento finalizado", description: "A anamnese foi registrada no prontuário." });
+        navigate("/medico/agenda");
         return;
       }
-      toast({
-        title: `Paciente ${p.nome} vinculado`,
-        description: "Já está selecionado abaixo, com o prontuário disponível.",
-      });
-      setCpfVincular("");
-      setPacienteId(p.id);
-    } catch (err: unknown) {
-      const msg = (err as Error).message ?? "";
-      const amigavel = /not found|0 rows|null value/i.test(msg)
-        ? "Nenhum paciente encontrado com esse CPF. Confirme o número com o paciente."
-        : msg;
-      toast({ title: "Não foi possível vincular", description: amigavel, variant: "destructive" });
+      toast({ title: "Anamnese registrada no prontuário" });
+      setForm(FORM_VAZIO);
+      setVitais(VITAIS_VAZIO);
+      setPatologias([]);
+    } catch (err) {
+      toast({ title: "Não foi possível salvar", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setSalvando("");
     }
   }
 
-  // Documentos do paciente selecionado
-  const { data: documentos = [], isLoading: loadingDocs } = useDocumentosPacienteMedico(pacienteId);
-  const uploadDocumento = useUploadDocumento();
-  const deleteDocumento = useDeleteDocumento();
-  const [nomeDoc, setNomeDoc] = useState("");
-  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  async function handleUploadMedico() {
-    if (!nomeDoc.trim()) {
-      toast({ title: "Nome obrigatório", description: "Informe um nome para o documento.", variant: "destructive" });
-      return;
-    }
-    if (!arquivoSelecionado) {
-      toast({ title: "Arquivo obrigatório", description: "Selecione um arquivo para enviar.", variant: "destructive" });
-      return;
-    }
-    const erro = validarArquivo(arquivoSelecionado);
-    if (erro) {
-      toast({ title: "Arquivo inválido", description: erro, variant: "destructive" });
-      return;
-    }
-    try {
-      await uploadDocumento.mutateAsync({ pacienteId, arquivo: arquivoSelecionado, nome: nomeDoc.trim() });
-      toast({ title: "Documento enviado", description: `"${nomeDoc}" salvo com sucesso.` });
-      setNomeDoc("");
-      setArquivoSelecionado(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    } catch {
-      toast({ title: "Erro ao enviar", description: "Não foi possível enviar o documento.", variant: "destructive" });
-    }
-  }
-
-  async function handleDeleteMedico(doc: typeof documentos[number]) {
-    try {
-      await deleteDocumento.mutateAsync(doc);
-      toast({ title: "Documento excluído" });
-    } catch {
-      toast({ title: "Erro ao excluir", variant: "destructive" });
-    }
-  }
-  const [queixa, setQueixa] = useState("");
-  const [historicoFamiliar, setHistoricoFamiliar] = useState("");
-  const [vitals, setVitals] = useState({ pressao: "", fc: "", temp: "", peso: "" });
-  const [pathologies, setPathologies] = useState<Pathology[]>([
-    { id: "diabetes", label: "Diabetes", active: false },
-    { id: "hipertensao", label: "Hipertensão", active: false },
-    { id: "depressao", label: "Depressão", active: false },
-    { id: "asma", label: "Asma", active: false },
-    { id: "cardiopatia", label: "Cardiopatia", active: false },
-    { id: "tireoide", label: "Tireoide", active: false },
-    { id: "obesidade", label: "Obesidade", active: false },
-    { id: "renal", label: "Insuficiência Renal", active: false },
-  ]);
-  const [cidSearch, setCidSearch] = useState("");
-  const [salvando, setSalvando] = useState(false);
-
-  const togglePathology = (id: string) => {
-    setPathologies((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, active: !p.active } : p)),
-    );
-  };
-
-  // IA: sugere CID baseado na queixa principal
-  const cidSuggestions = useMemo(() => {
-    const text = (queixa + " " + cidSearch).toLowerCase();
-    if (text.trim().length < 3) return [];
-    return cidDictionary.filter((c) =>
-      c.keywords.some((k) => text.includes(k)),
-    );
-  }, [queixa, cidSearch]);
-
-  const aiAnalyzing = queixa.trim().length > 5;
-
-  const handleSalvar = async () => {
-    if (!pacienteId) { toast({ title: "Selecione um paciente", variant: "destructive" }); return; }
-    setSalvando(true);
-    try {
-      await salvarAnamnese.mutateAsync({
-        paciente_id: pacienteId,
-        queixa_principal: queixa,
-        antecedentes_familiares: historicoFamiliar,
-        sinais_vitais: vitals,
-        patologias: pathologies.filter((p) => p.active).map((p) => p.label),
-      });
-      toast({ title: "Prontuário salvo com sucesso!" });
-    } catch { toast({ title: "Erro ao salvar prontuário", variant: "destructive" }); }
-    finally { setSalvando(false); }
-  };
-
-  const pacienteSelecionado = pacientes.find((p) => p.id === pacienteId);
+  const idade = paciente?.data_nascimento ? differenceInYears(new Date(), new Date(paciente.data_nascimento)) : null;
+  const emAtendimento = consulta?.status === "Em andamento";
 
   return (
     <DashboardLayout navItems={navItems}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Page header */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <div className="mx-auto max-w-7xl">
+        {/* Cabeçalho */}
+        <header className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6">
           <div>
-            <p className="text-primary text-xs font-semibold tracking-widest uppercase mb-2">
-              Atendimento
-            </p>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Anamnese Inteligente
+            <p className="eyebrow mb-3">{consulta ? "Atendimento em curso" : "Prontuário"}</p>
+            <h1 className="font-display text-5xl leading-none text-foreground">
+              Anamnese{paciente && <span className="text-muted-foreground"> · </span>}
+              {paciente && <em>{paciente.nome.split(" ")[0]}</em>}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Prontuário do paciente com assistência clínica em tempo real.
-            </p>
+            {consulta && (
+              <p className="mt-3 text-[15px] text-muted-foreground">
+                Consulta de{" "}
+                <span className="font-mono text-foreground">{format(new Date(consulta.data_hora), "dd/MM · HH:mm")}</span> ·{" "}
+                {consulta.tipo}
+                <button onClick={sairDaConsulta} className="ml-3 text-xs text-primary hover:underline underline-offset-4">
+                  desvincular desta consulta
+                </button>
+              </p>
+            )}
           </div>
-        </div>
 
-        {/* H1 — visibilidade do status. Quando o médico vem da agenda
-            clicando em "Iniciar Atendimento", contextualiza onde ele está. */}
-        {consultaAtual && (
-          <div
-            className="rounded-2xl border border-primary/30 px-5 py-4 flex items-center gap-3"
-            style={{
-              background:
-                "linear-gradient(90deg, hsl(var(--primary) / 0.08), hsl(var(--primary) / 0.02))",
-            }}
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold text-primary uppercase tracking-wider">
-                Consulta em andamento
-              </p>
-              <p className="text-sm font-semibold text-foreground truncate">
-                {consultaAtual.paciente?.profile?.nome ?? "Paciente"}
-                <span className="text-muted-foreground font-normal">
-                  {" · "}
-                  {consultaAtual.tipo} · iniciada às{" "}
-                  {formatDate(new Date(consultaAtual.data_hora), "HH:mm", { locale: ptBR })}
-                </span>
-              </p>
+          {!consulta && (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <Select value={pacienteId} onValueChange={setPacienteId}>
+                <SelectTrigger className="h-11 sm:w-80" aria-label="Paciente">
+                  <SelectValue placeholder={carregandoPacientes ? "Carregando pacientes…" : "Escolha o paciente"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {pacientes.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome} <span className="font-mono text-muted-foreground">· {maskCPF(p.cpf)}</span>
+                    </SelectItem>
+                  ))}
+                  {pacientes.length === 0 && (
+                    <SelectItem value="_vazio" disabled>
+                      Nenhum paciente na sua lista
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" className="h-11 gap-2" onClick={() => setMostrarVincular((v) => !v)}>
+                <UserPlus className="h-4 w-4" /> Buscar por CPF
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                searchParams.delete("consultaId");
-                searchParams.delete("pacienteId");
-                setSearchParams(searchParams);
-              }}
-              className="text-xs text-muted-foreground"
-            >
-              Sair desta consulta
+          )}
+        </header>
+
+        {mostrarVincular && (
+          <div className="mt-4 flex flex-col gap-2 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center">
+            <p className="flex-1 text-sm text-muted-foreground">
+              Paciente ainda não está na sua lista? Informe o CPF para assumir o acompanhamento.
+            </p>
+            <Input
+              value={cpf}
+              onChange={(e) => setCpf(maskCPF(e.target.value))}
+              placeholder="000.000.000-00"
+              inputMode="numeric"
+              className="font-mono sm:w-48"
+              aria-label="CPF do paciente"
+            />
+            <Button onClick={handleVincular} disabled={vincular.isPending}>
+              {vincular.isPending ? "Buscando…" : "Adicionar"}
             </Button>
           </div>
         )}
 
-        {/* Patient identification card */}
-        <div
-          className="bg-card border border-border/40 rounded-2xl p-6 lg:p-7"
-          style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)" }}
-        >
-          <div className="flex flex-col md:flex-row md:items-center gap-6">
-            <div className="flex-1 min-w-0">
-              <div className="mb-4">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Selecionar Paciente</Label>
-                <Select value={pacienteId} onValueChange={setPacienteId}>
-                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background max-w-sm">
-                    <SelectValue placeholder="Selecionar paciente..." />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {pacientes.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.nome} — CPF {p.cpf}</SelectItem>
-                    ))}
-                    {pacientes.length === 0 && <SelectItem value="_none" disabled>Nenhum paciente vinculado</SelectItem>}
-                  </SelectContent>
-                </Select>
-                <div className="mt-3 flex flex-col sm:flex-row gap-2 max-w-md">
-                  <Input
-                    placeholder="Vincular paciente por CPF"
-                    value={cpfVincular}
-                    onChange={(e) => setCpfVincular(e.target.value)}
-                    className="h-10 rounded-xl"
-                  />
-                  <Button onClick={handleVincular} disabled={vincularPaciente.isPending} className="shrink-0">
-                    {vincularPaciente.isPending ? "Vinculando…" : "Vincular"}
-                  </Button>
-                </div>
-              </div>
-              {pacienteSelecionado && (
+        {!paciente ? (
+          <div className="mt-10 rounded-xl border border-border bg-card">
+            <EstadoVazio
+              imagem={vazioAnamnese}
+              titulo={
                 <>
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h2 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">{pacienteSelecionado.nome}</h2>
-                    <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/15 rounded-full text-[10px] font-semibold uppercase tracking-wider">Em consulta</Badge>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-                    <PatientStat icon={IdCard} label="CPF" value={pacienteSelecionado.cpf} />
-                    {pacienteSelecionado.email && <PatientStat icon={UserSquare2} label="E-mail" value={pacienteSelecionado.email} />}
-                  </div>
+                  Escolha um <em className="text-primary">paciente</em> para começar.
                 </>
+              }
+            >
+              Selecione na lista acima ou inicie o atendimento pela agenda — assim a anamnese fica ligada à consulta.
+            </EstadoVazio>
+          </div>
+        ) : (
+          <>
+            {/* Identificação */}
+            <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-2 rounded-lg bg-secondary/60 px-5 py-3.5 text-sm">
+              <span className="font-medium text-foreground">{paciente.nome}</span>
+              <span className="font-mono text-muted-foreground">CPF {maskCPF(paciente.cpf)}</span>
+              {idade !== null && <span className="font-mono text-muted-foreground">{idade} anos</span>}
+              {paciente.ultima_consulta && (
+                <span className="text-muted-foreground">
+                  Última consulta {format(new Date(paciente.ultima_consulta), "dd MMM yyyy", { locale: ptBR })}
+                </span>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Main grid: forms (2 cols) + AI panel (1 col) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* LEFT: form cards */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Card 1: Queixa principal */}
-            <SectionCard
-              title="Queixa Principal e Evolução"
-              subtitle="Descreva os sintomas relatados pelo paciente"
-              icon={Stethoscope}
-            >
-              <div className="space-y-3">
-                <Textarea
-                  id="queixa"
-                  name="queixa"
-                  placeholder="Ex: Paciente relata dor de cabeça constante há 5 dias, com piora ao final da tarde..."
-                  value={queixa}
-                  onChange={(e) => setQueixa(e.target.value)}
-                  className="min-h-[140px] rounded-xl border-border/60 bg-background focus-visible:ring-primary/20 focus-visible:ring-offset-0 focus-visible:border-primary/50 resize-none"
-                />
-                {aiAnalyzing && (
-                  <div className="flex items-center gap-2 text-xs text-primary/80 italic animate-in fade-in duration-300">
-                    <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-                    Analisando sintomas para sugerir CID...
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-5 pt-5 border-t border-dashed border-border/50 space-y-2">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Histórico Familiar
-                </Label>
-                <Textarea
-                  id="historicoFamiliar"
-                  name="historicoFamiliar"
-                  placeholder="Pais, irmãos, condições hereditárias relevantes..."
-                  value={historicoFamiliar}
-                  onChange={(e) => setHistoricoFamiliar(e.target.value)}
-                  className="min-h-[80px] rounded-xl border-border/60 bg-background focus-visible:ring-primary/20 focus-visible:ring-offset-0 focus-visible:border-primary/50 resize-none"
-                />
-              </div>
-            </SectionCard>
-
-            {/* Card 2: Patologias */}
-            <SectionCard
-              title="Histórico e Patologias"
-              subtitle="Marque as condições preexistentes do paciente"
-              icon={Activity}
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {pathologies.map((p) => (
-                  <label
-                    key={p.id}
-                    className={cn(
-                      "flex items-center justify-between gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer",
-                      p.active
-                        ? "bg-primary/5 border-primary/30"
-                        : "bg-background border-border/60 hover:border-primary/30 hover:bg-primary/[0.02]",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "text-sm font-medium transition-colors",
-                        p.active ? "text-primary" : "text-foreground/80",
-                      )}
-                    >
-                      {p.label}
-                    </span>
-                    <Switch
-                      checked={p.active}
-                      onCheckedChange={() => togglePathology(p.id)}
-                    />
-                  </label>
-                ))}
-              </div>
-            </SectionCard>
-
-            {/* Card 3: Sinais vitais */}
-            <SectionCard
-              title="Sinais Vitais"
-              subtitle="Medidas atuais aferidas no atendimento"
-              icon={HeartPulse}
-            >
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <VitalInput
-                  icon={Activity}
-                  label="Pressão Arterial"
-                  unit="mmHg"
-                  placeholder="120/80"
-                  value={vitals.pressao}
-                  onChange={(v) => setVitals({ ...vitals, pressao: v })}
-                />
-                <VitalInput
-                  icon={HeartPulse}
-                  label="Frequência Cardíaca"
-                  unit="bpm"
-                  placeholder="72"
-                  value={vitals.fc}
-                  onChange={(v) => setVitals({ ...vitals, fc: v })}
-                />
-                <VitalInput
-                  icon={Thermometer}
-                  label="Temperatura"
-                  unit="°C"
-                  placeholder="36.5"
-                  value={vitals.temp}
-                  onChange={(v) => setVitals({ ...vitals, temp: v })}
-                />
-                <VitalInput
-                  icon={Scale}
-                  label="Peso"
-                  unit="kg"
-                  placeholder="68.5"
-                  value={vitals.peso}
-                  onChange={(v) => setVitals({ ...vitals, peso: v })}
-                />
-              </div>
-            </SectionCard>
-          </div>
-
-          {/* RIGHT: AI Insights panel (sticky) */}
-          <aside className="lg:col-span-1">
-            <div className="lg:sticky lg:top-6 space-y-4">
-              <div
-                className="rounded-2xl p-6 border border-primary/20 relative overflow-hidden"
-                style={{
-                  background:
-                    "linear-gradient(160deg, hsl(var(--card)) 0%, hsl(var(--secondary)) 100%)",
-                  boxShadow: "0 4px 30px -8px hsl(var(--primary) / 0.16)",
+            <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+              {/* Roteiro clínico */}
+              <form
+                className="space-y-10"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSalvar(emAtendimento);
                 }}
               >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+                <Secao n="01" titulo="Queixa principal" obrigatorio>
+                  <Textarea
+                    id="queixa_principal"
+                    value={form.queixa_principal}
+                    onChange={set("queixa_principal")}
+                    placeholder="Nas palavras do paciente — ex.: “dor de cabeça há 5 dias”"
+                    className={cn(textareaClass, "min-h-[72px]")}
+                  />
+                </Secao>
 
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-sm">
-                      <Brain className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-primary uppercase tracking-widest">
-                        Insights da IA
-                      </p>
-                      <p className="text-sm font-semibold text-foreground tracking-tight">
-                        Assistente Clínico
-                      </p>
-                    </div>
+                <Secao n="02" titulo="História da doença atual">
+                  <Textarea
+                    value={form.historia_doenca}
+                    onChange={set("historia_doenca")}
+                    placeholder="Início, duração, localização, intensidade, fatores de melhora e piora, sintomas associados…"
+                    className={cn(textareaClass, "min-h-[130px]")}
+                  />
+                </Secao>
+
+                <Secao n="03" titulo="Antecedentes">
+                  <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Condições preexistentes">
+                    {PATOLOGIAS.map((p) => {
+                      const ativo = patologias.includes(p);
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          aria-pressed={ativo}
+                          onClick={() => setPatologias((l) => (ativo ? l.filter((x) => x !== p) : [...l, p]))}
+                          className={cn(
+                            "rounded-full border px-3 py-1 text-sm transition-colors",
+                            ativo
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                          )}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
                   </div>
-
-                  {/* CID search */}
-                  <div className="mt-5 space-y-2">
-                    <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Busca inteligente de CID
-                    </Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                      <Input
-                        id="cidSearch"
-                        name="cidSearch"
-                        placeholder="Digite o sintoma..."
-                        value={cidSearch}
-                        onChange={(e) => setCidSearch(e.target.value)}
-                        className="h-10 pl-9 rounded-xl border-border/60 bg-card focus-visible:ring-primary/20 focus-visible:ring-offset-0 focus-visible:border-primary/50 text-sm"
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Campo rotulo="Pessoais">
+                      <Textarea
+                        value={form.antecedentes_pessoais}
+                        onChange={set("antecedentes_pessoais")}
+                        placeholder="Cirurgias, internações, hábitos…"
+                        className={textareaClass}
                       />
-                    </div>
+                    </Campo>
+                    <Campo rotulo="Familiares">
+                      <Textarea
+                        value={form.antecedentes_familiares}
+                        onChange={set("antecedentes_familiares")}
+                        placeholder="Doenças em pais, irmãos…"
+                        className={textareaClass}
+                      />
+                    </Campo>
                   </div>
+                </Secao>
 
-                  {/* Suggestions */}
-                  <div className="mt-4 space-y-2.5">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Sugestões de CID
-                    </p>
+                <Secao n="04" titulo="Medicamentos e alergias">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Campo rotulo="Em uso">
+                      <Textarea
+                        value={form.medicamentos_uso}
+                        onChange={set("medicamentos_uso")}
+                        placeholder="Nome, dose e posologia"
+                        className={textareaClass}
+                      />
+                    </Campo>
+                    <Campo rotulo="Alergias" destaque>
+                      <Textarea
+                        value={form.alergias}
+                        onChange={set("alergias")}
+                        placeholder="Medicamentos, alimentos… ou “nega alergias”"
+                        className={textareaClass}
+                      />
+                    </Campo>
+                  </div>
+                </Secao>
 
-                    {cidSuggestions.length === 0 && (
-                      <div className="rounded-xl bg-card/60 border border-dashed border-border/60 p-4 text-center">
-                        <Sparkles className="h-4 w-4 text-primary/40 mx-auto mb-1.5" />
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          Comece a descrever a queixa para receber sugestões automáticas de CID-10.
-                        </p>
-                      </div>
-                    )}
-
-                    {cidSuggestions.map((s) => (
-                      <button
-                        key={s.code}
-                        type="button"
-                        onClick={() => { /* TODO: Implementar lógica no Cursor - Selecionar CID */ }}
-                        className="group w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-card border border-border/50 hover:border-primary/40 hover:bg-primary/[0.03] transition-all text-left animate-in fade-in slide-in-from-right-2 duration-300"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Badge className="bg-primary text-primary-foreground hover:bg-primary rounded-md text-[10px] font-bold tracking-wider flex-shrink-0">
-                            {s.code}
-                          </Badge>
-                          <span className="text-sm text-foreground/85 truncate">
-                            {s.label}
+                <Secao n="05" titulo="Exame físico">
+                  <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+                    {SINAIS.map((s) => (
+                      <label key={s.chave} className="block">
+                        <span className="eyebrow !text-[10px]">{s.rotulo}</span>
+                        <div className="relative mt-1">
+                          <Input
+                            value={vitais[s.chave]}
+                            onChange={(e) => setVitais((v) => ({ ...v, [s.chave]: e.target.value }))}
+                            placeholder={s.placeholder}
+                            inputMode="decimal"
+                            className="pr-11 font-mono"
+                          />
+                          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                            {s.unidade}
                           </span>
                         </div>
-                        <Plus className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
-                      </button>
+                      </label>
                     ))}
                   </div>
+                  <Textarea
+                    value={form.exame_fisico}
+                    onChange={set("exame_fisico")}
+                    placeholder="Estado geral, aparelhos e sistemas examinados…"
+                    className={textareaClass}
+                  />
+                </Secao>
 
-                  {/* Clinical hint */}
-                  {aiAnalyzing && (
-                    <div className="mt-4 pt-4 border-t border-primary/15">
-                      <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                        <Sparkles className="h-3 w-3" />
-                        Observação clínica
-                      </p>
-                      <p className="text-xs text-foreground/75 italic leading-relaxed">
-                        Considere avaliar histórico de cefaleia recorrente e padrão de sono nas últimas 2 semanas.
-                      </p>
-                    </div>
+                <Secao n="06" titulo="Hipótese diagnóstica">
+                  <div className="relative mb-3">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={cidBusca}
+                      onChange={(e) => setCidBusca(e.target.value)}
+                      placeholder="Buscar CID-10 por código ou nome (ex.: I10, lombar)"
+                      className="pl-9"
+                      aria-label="Buscar CID-10"
+                    />
+                    {cids.length > 0 && (
+                      <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
+                        {cids.map((c) => (
+                          <li key={c.codigo}>
+                            <button
+                              type="button"
+                              onClick={() => adicionarCid(c.codigo, c.descricao)}
+                              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-muted"
+                            >
+                              <span className="w-14 font-mono text-xs font-medium text-primary">{c.codigo}</span>
+                              <span className="flex-1 text-foreground">{c.descricao}</span>
+                              <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <Textarea
+                    value={form.hipotese_diagnostica}
+                    onChange={set("hipotese_diagnostica")}
+                    placeholder="Hipóteses e diagnósticos diferenciais"
+                    className={textareaClass}
+                  />
+                </Secao>
+
+                <Secao n="07" titulo="Conduta">
+                  <Textarea
+                    value={form.conduta}
+                    onChange={set("conduta")}
+                    placeholder="Orientações, exames solicitados, encaminhamentos, retorno…"
+                    className={textareaClass}
+                  />
+                </Secao>
+
+                {/* Ações */}
+                <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-background/90 px-4 py-4 backdrop-blur lg:-mx-8 lg:px-8">
+                  <p className="mr-auto hidden text-xs text-muted-foreground md:block">
+                    O registro fica no prontuário e pode ser corrigido pelo autor por 24 horas.
+                  </p>
+                  {emAtendimento ? (
+                    <>
+                      <Button type="button" variant="ghost" disabled={!!salvando} onClick={() => handleSalvar(false)}>
+                        {salvando === "salvar" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Salvar sem finalizar
+                      </Button>
+                      <Button type="submit" disabled={!!salvando} className="gap-2">
+                        {salvando === "finalizar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        Salvar e finalizar atendimento
+                      </Button>
+                    </>
+                  ) : (
+                    <Button type="submit" disabled={!!salvando} className="gap-2">
+                      {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      Registrar anamnese
+                    </Button>
                   )}
                 </div>
-              </div>
-            </div>
-          </aside>
-        </div>
+              </form>
 
-        {/* Painel de Documentos do Paciente (D-06) */}
-        {pacienteId && (
-          <section className="bg-card border border-border/40 rounded-2xl p-6" style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)" }}>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Paperclip className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-foreground">Exames e Documentos</h3>
-                <p className="text-xs text-muted-foreground">Documentos do paciente selecionado</p>
-              </div>
+              <aside className="lg:sticky lg:top-24 lg:self-start">
+                <HistoricoPaciente pacienteId={paciente.id} />
+                {consulta && !emAtendimento && consulta.status !== "Finalizado" && (
+                  <p className="mt-6 flex items-start gap-2 rounded-lg border border-border p-3 text-xs text-muted-foreground">
+                    <X className="mt-0.5 h-3.5 w-3.5" /> Esta consulta não está em atendimento. Inicie-a pela agenda para
+                    poder finalizá-la daqui.
+                  </p>
+                )}
+              </aside>
             </div>
 
-            {/* Formulário de upload */}
-            <div className="bg-muted/30 border border-border/40 rounded-xl p-4 mb-4">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Enviar documento</p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Input
-                  placeholder="Nome do documento (ex: Raio-X Tórax - Abr/2026)"
-                  value={nomeDoc}
-                  onChange={(e) => setNomeDoc(e.target.value)}
-                  className="flex-1"
-                />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="hidden"
-                  onChange={(e) => setArquivoSelecionado(e.target.files?.[0] ?? null)}
-                />
-                <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="shrink-0">
-                  <Upload className="h-4 w-4 mr-2" />
-                  {arquivoSelecionado ? arquivoSelecionado.name.slice(0, 18) + (arquivoSelecionado.name.length > 18 ? "…" : "") : "Selecionar arquivo"}
-                </Button>
-                <Button onClick={handleUploadMedico} disabled={uploadDocumento.isPending} className="shrink-0">
-                  {uploadDocumento.isPending ? "Enviando…" : "Enviar"}
-                </Button>
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-2">PDF, JPG ou PNG · máximo 20 MB</p>
+            <div className="mt-12">
+              <DocumentosPacientePanel pacienteId={paciente.id} />
             </div>
-
-            {/* Lista de documentos */}
-            {loadingDocs ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              </div>
-            ) : documentos.length === 0 ? (
-              <div className="border border-dashed border-border rounded-xl p-8 text-center">
-                <p className="text-sm text-muted-foreground">Nenhum documento para este paciente</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {documentos.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-border/40 bg-background">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Paperclip className="h-4 w-4 text-primary shrink-0" />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-semibold text-foreground truncate">{doc.nome}</p>
-                          {doc.categoria && (
-                            <Badge variant="secondary" className="rounded-full text-[10px] px-2 py-0 h-5 bg-primary/10 text-primary hover:bg-primary/15">
-                              {DOCUMENTO_CATEGORIA_LABEL[doc.categoria]}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          {doc.tipo_arquivo.toUpperCase()}
-                          {doc.data_exame ? ` · Exame de ${formatDate(new Date(doc.data_exame + "T00:00:00"), "dd/MM/yyyy")}` : ""}
-                          {doc.tamanho_bytes ? ` · ${(doc.tamanho_bytes / 1024 / 1024).toFixed(1)} MB` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => downloadDocumento(doc).catch(() => toast({ title: "Erro ao baixar", variant: "destructive" }))}
-                        title="Baixar"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      {doc.uploaded_by === user?.id && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleDeleteMedico(doc)}
-                          disabled={deleteDocumento.isPending}
-                          className="text-destructive hover:text-destructive"
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          </>
         )}
-
-        {/* Footer actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 pt-2 pb-4">
-          <Button
-            variant="ghost"
-            onClick={() => { /* TODO: Implementar lógica no Cursor - Gerar Atestado */ }}
-            className="text-primary hover:text-primary hover:bg-primary/5 rounded-xl gap-2"
-          >
-            <FileSignature className="h-4 w-4" />
-            Gerar Atestado
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => { /* TODO: Implementar lógica no Cursor - Imprimir Relatório */ }}
-            className="rounded-xl border-primary/40 text-primary hover:bg-primary/5 hover:text-primary hover:border-primary/60 gap-2"
-          >
-            <Printer className="h-4 w-4" />
-            Imprimir Relatório
-          </Button>
-          <Button onClick={handleSalvar} disabled={salvando} className="rounded-xl gap-2 shadow-sm">
-            {salvando && <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />}
-            <Save className="h-4 w-4" />
-            {salvando ? "Salvando..." : "Salvar Prontuário"}
-          </Button>
-        </div>
       </div>
     </DashboardLayout>
   );
 }
 
-/* -------------------------------- Helpers --------------------------------- */
-
-function PatientStat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
+function Secao({ n, titulo, obrigatorio, children }: { n: string; titulo: string; obrigatorio?: boolean; children: ReactNode }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-muted/40 border border-border/40">
-      <Icon className="h-4 w-4 text-primary flex-shrink-0" strokeWidth={1.75} />
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold leading-tight">
-          {label}
-        </p>
-        <p className="text-sm font-semibold text-foreground truncate leading-tight mt-0.5">
-          {value}
-        </p>
+    <section className="grid gap-4 md:grid-cols-[3rem_minmax(0,1fr)]">
+      <span className="font-mono text-sm text-muted-foreground md:pt-1">{n}</span>
+      <div>
+        <h2 className="mb-3 text-lg font-medium text-foreground">
+          {titulo}
+          {obrigatorio && <span className="ml-1 text-destructive" aria-label="obrigatório">*</span>}
+        </h2>
+        {children}
       </div>
-    </div>
-  );
-}
-
-function SectionCard({
-  title,
-  subtitle,
-  icon: Icon,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  icon: LucideIcon;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      className="bg-card border border-border/40 rounded-2xl p-6 lg:p-7"
-      style={{ boxShadow: "0 2px 24px -6px rgba(0,0,0,0.06)" }}
-    >
-      <div className="flex items-start gap-3 mb-5">
-        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Icon className="h-4.5 w-4.5 text-primary" strokeWidth={1.75} />
-        </div>
-        <div className="min-w-0">
-          <h3 className="text-base font-semibold text-foreground tracking-tight leading-tight">
-            {title}
-          </h3>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-          )}
-        </div>
-      </div>
-      {children}
     </section>
   );
 }
 
-function VitalInput({
-  icon: Icon,
-  label,
-  unit,
-  placeholder,
-  value,
-  onChange,
-}: {
-  icon: LucideIcon;
-  label: string;
-  unit: string;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function Campo({ rotulo, destaque, children }: { rotulo: string; destaque?: boolean; children: ReactNode }) {
   return (
-    <div className="space-y-2">
-      <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-        <Icon className="h-3 w-3 text-primary" strokeWidth={2} />
-        {label}
-      </Label>
-      <div className="relative">
-        <Input
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-11 pr-12 rounded-xl border-border/60 bg-background focus-visible:ring-primary/20 focus-visible:ring-offset-0 focus-visible:border-primary/50 text-sm font-medium"
-        />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          {unit}
-        </span>
-      </div>
-    </div>
+    <label className="block">
+      <span className={cn("eyebrow mb-1.5 block !text-[10px]", destaque && "!text-destructive")}>{rotulo}</span>
+      {children}
+    </label>
   );
 }

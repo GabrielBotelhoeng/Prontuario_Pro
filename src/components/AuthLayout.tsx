@@ -1,4 +1,5 @@
-import { ReactNode, useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { ShieldCheck } from "lucide-react";
 import corridor from "@/assets/hospital-corridor.webp";
 import { BrandLockup, BrandMark } from "@/components/Brand";
@@ -10,18 +11,6 @@ interface AuthLayoutProps {
 }
 
 const AMBIENT_VIDEO = "/media/login-ambient.mp4";
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return reduced;
-}
 
 const AuthLayout = ({ children, aside }: AuthLayoutProps) => {
   const reducedMotion = usePrefersReducedMotion();

@@ -221,3 +221,31 @@ export function useEstatisticasMedico() {
     },
   });
 }
+
+/** Paciente cancela a própria consulta futura (RPC com regras no banco). */
+export function useCancelarConsultaPaciente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (consultaId: string) => {
+      const { error } = await supabase.rpc("cancelar_consulta_paciente", { p_consulta: consultaId });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["consultas"] });
+      qc.invalidateQueries({ queryKey: ["proxima-consulta"] });
+    },
+  });
+}
+
+/** Horários já ocupados de um médico em um dia (yyyy-MM-dd), sem dados de outros pacientes. */
+export function useHorariosOcupados(medicoId: string, dia: string) {
+  return useQuery({
+    queryKey: ["horarios-ocupados", medicoId, dia],
+    enabled: !!medicoId && !!dia,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("horarios_ocupados", { p_medico: medicoId, p_dia: dia });
+      if (error) throw error;
+      return ((data ?? []) as string[]).map((iso) => new Date(iso));
+    },
+  });
+}

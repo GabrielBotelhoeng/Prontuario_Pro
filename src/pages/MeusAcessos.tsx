@@ -1,19 +1,12 @@
 import { Home, FileText, FolderHeart, CalendarDays, ShieldCheck, History, Stethoscope, User, FileSearch, Pill, ClipboardList, Download, Upload, LogIn, AlertCircle } from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import DashboardLayout from "@/components/DashboardLayout";
+import { pacienteNavItems as navItems } from "@/lib/nav";
 import { useMeusAcessos } from "@/hooks/useAuditLogs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import type { AuditLogRow } from "@/lib/database.types";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/paciente", icon: Home },
-  { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
-  { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
-  { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
-  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
-  { title: "Acessos", url: "/paciente/acessos", icon: History },
-];
 
 const ACTION_LABEL: Record<string, string> = {
   prontuario_visualizado: "Visualizou seu prontuário",

@@ -38,6 +38,27 @@ export function useAnamnesesPaciente() {
   });
 }
 
+/**
+ * Histórico clínico de um paciente visto pelo médico. Pela RLS (migration 020),
+ * inclui anamneses de outros médicos do hospital quando há vínculo com o paciente.
+ */
+export function useAnamnesesDoPaciente(pacienteId: string | null) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["anamneses", "do-paciente", pacienteId, user?.id],
+    enabled: !!user?.id && !!pacienteId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("anamneses")
+        .select("*, medico:medicos(crm, especialidade, profile:profiles(nome))")
+        .eq("paciente_id", pacienteId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Anamnese[];
+    },
+  });
+}
+
 interface SalvarAnamneseData {
   paciente_id: string;
   queixa_principal?: string;
@@ -64,7 +85,12 @@ export function useSalvarAnamnese() {
         .insert({ ...data, medico_id: user!.id })
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        if (error.code === "42501" || /row-level security/i.test(error.message)) {
+          throw new Error("Você não tem vínculo com este paciente. Agende uma consulta ou vincule-o pelo CPF.");
+        }
+        throw new Error("Não foi possível salvar a anamnese. Tente novamente.");
+      }
       return result as Anamnese;
     },
     onSuccess: (result) => {

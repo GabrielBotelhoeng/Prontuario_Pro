@@ -85,12 +85,17 @@ export interface Anamnese {
   sinais_vitais: {
     pressao?: string;
     fc?: string;
+    fr?: string;
     temp?: string;
+    spo2?: string;
     peso?: string;
+    altura?: string;
   } | null;
   patologias: string[] | null;
   created_at: string;
   updated_at: string;
+  medico?: { crm: string; especialidade: string; profile?: { nome: string } };
+  paciente?: { profile?: { nome: string } };
 }
 
 export interface Notificacao {

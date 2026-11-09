@@ -1,214 +1,263 @@
-import {
-  Home,
-  FileText,
-  ClipboardList,
-  CalendarDays,
-  BarChart3,
-  CalendarCheck,
-  Stethoscope,
-  AlertCircle,
-  Clock,
-  Users,
-  UserRound,
-  Sparkles,
-  ShieldAlert,
-  ArrowRight,
-  FolderOpen,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
-import { useAuth } from "@/contexts/AuthContext";
-import { useConsultasMedico, useProximaConsultaMedico } from "@/hooks/useConsultas";
-import { format } from "date-fns";
+import { useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { format, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ArrowRight, Check, ClipboardList, FileText, FolderOpen, PlayCircle, X } from "lucide-react";
+import { toast } from "sonner";
+import DashboardLayout from "@/components/DashboardLayout";
+import { medicoNavItems as navItems } from "@/lib/nav";
+import { useAuth } from "@/contexts/AuthContext";
+import { useConsultasMedico, useUpdateConsultaStatus } from "@/hooks/useConsultas";
+import { usePacientesDoMedico } from "@/hooks/usePacientes";
+import { AmbientMedia } from "@/components/AmbientMedia";
+import { StatusConsulta } from "@/components/clinico/StatusConsulta";
+import { EstadoVazio } from "@/components/clinico/EstadoVazio";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import type { Consulta } from "@/lib/database.types";
 import consultorioImg from "@/assets/consultorio.webp";
+import vazioAgenda from "@/assets/vazio/agenda.webp";
 
-const navItems: NavItem[] = [
-  { title: "Início", url: "/medico", icon: Home },
-  { title: "Prescrição Digital", url: "/medico/prescricao", icon: FileText },
-  { title: "Anamnese", url: "/medico/anamnese", icon: ClipboardList },
-  { title: "Agenda", url: "/medico/agenda", icon: CalendarDays },
-  { title: "Documentos", url: "/medico/documentos", icon: FolderOpen },
-  { title: "Monitoramento", url: "/medico/monitoramento", icon: BarChart3 },
-  { title: "Painel de IA", url: "/medico/painel-ia", icon: Sparkles },
-];
-
-const quickActions = [
-  { title: "Ver Agenda de Hoje", description: "Consultas agendadas", icon: CalendarCheck, color: "bg-primary/10 text-primary", url: "/medico/agenda" },
-  { title: "Nova Consulta", description: "Iniciar atendimento", icon: Stethoscope, color: "bg-emerald-500/10 text-emerald-600", url: "/medico/anamnese" },
-  { title: "Alertas Clínicos", description: "Painel de IA", icon: AlertCircle, color: "bg-amber-500/10 text-amber-600", url: "/medico/painel-ia" },
+const ATALHOS = [
+  { titulo: "Nova anamnese", descricao: "Registrar atendimento", url: "/medico/anamnese", icon: ClipboardList },
+  { titulo: "Prescrever", descricao: "Receita digital com QR", url: "/medico/prescricao", icon: FileText },
+  { titulo: "Documentos", descricao: "Exames dos pacientes", url: "/medico/documentos", icon: FolderOpen },
 ];
 
 export default function DashboardMedico() {
   const { profile, medico } = useAuth();
-  const { data: consultas = [] } = useConsultasMedico();
-  const { data: proxima } = useProximaConsultaMedico();
   const navigate = useNavigate();
+  const { data: consultas = [], isLoading } = useConsultasMedico();
+  const { data: pacientes = [] } = usePacientesDoMedico();
+  const atualizar = useUpdateConsultaStatus();
 
-  const hoje = new Date().toDateString();
-  const consultasHoje = consultas.filter((c) => new Date(c.data_hora).toDateString() === hoje);
-  const finalizadas = consultasHoje.filter((c) => c.status === "Finalizado").length;
-  const aguardando = consultasHoje.filter((c) => c.status === "Aguardando" || c.status === "Em andamento").length;
+  const hoje = useMemo(
+    () => consultas.filter((c) => isToday(new Date(c.data_hora)) && c.status !== "Cancelado"),
+    [consultas],
+  );
+  const solicitacoes = useMemo(
+    () => consultas.filter((c) => c.status === "Aguardando" && new Date(c.data_hora) > new Date()),
+    [consultas],
+  );
+  const finalizadas = hoje.filter((c) => c.status === "Finalizado").length;
+  // Próximo atendimento: em curso, ou confirmado que ainda não passou de 1h do horário.
+  const limite = Date.now() - 60 * 60 * 1000;
+  const proxima =
+    hoje.find((c) => c.status === "Em andamento") ??
+    hoje.find((c) => c.status === "Confirmado" && new Date(c.data_hora).getTime() >= limite);
 
-  const stats = [
-    { label: "Pacientes hoje", value: String(consultasHoje.length), icon: Users, trend: `+${consultasHoje.length}` },
-    { label: "Consultas realizadas", value: String(finalizadas), icon: Clock, trend: `+${finalizadas}` },
-    { label: "Pacientes aguardando", value: String(aguardando), icon: UserRound, trend: "agora" },
+  const primeiroNome = profile?.nome?.split(" ")[0] ?? "";
+  const h = new Date().getHours();
+  const saudacao = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+
+  async function mudarStatus(c: Consulta, status: Consulta["status"], msg: string) {
+    try {
+      await atualizar.mutateAsync({ id: c.id, status });
+      toast.success(msg);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
+  async function iniciar(c: Consulta) {
+    try {
+      if (c.status !== "Em andamento") await atualizar.mutateAsync({ id: c.id, status: "Em andamento" });
+      navigate(`/medico/anamnese?consultaId=${c.id}&pacienteId=${c.paciente_id}`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
+  const numeros: [string, number][] = [
+    ["Consultas hoje", hoje.length],
+    ["Finalizadas", finalizadas],
+    ["A confirmar", solicitacoes.length],
+    ["Pacientes na lista", pacientes.length],
   ];
-
-  const primeiroNome = profile?.nome?.split(" ")[0] ?? "Doutor(a)";
-  const especialidade = medico?.especialidade ?? "Corpo clínico";
-  const hora = new Date().getHours();
-  const saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
 
   return (
     <DashboardLayout navItems={navItems}>
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Hero Card */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="flex flex-col lg:flex-row">
-            <div className="flex-1 p-8 lg:p-10 flex flex-col justify-center">
-              <p className="eyebrow mb-4">{especialidade}</p>
-              <h1 className="font-display text-4xl lg:text-5xl leading-[1.02] text-foreground mb-4">
-                {saudacao}, <em>{primeiroNome}</em>.
-              </h1>
-              <p className="text-muted-foreground text-[15px] leading-relaxed max-w-lg">
-                Você tem{" "}
-                <span className="font-mono text-foreground">{String(consultasHoje.length).padStart(2, "0")}</span>{" "}
-                {consultasHoje.length === 1 ? "consulta agendada" : "consultas agendadas"} para hoje.
-              </p>
-            </div>
-            <div className="lg:w-[380px] xl:w-[440px] h-56 lg:h-auto flex-shrink-0">
-              <img src={consultorioImg} alt="" className="w-full h-full object-cover" width={1200} height={900} />
-            </div>
+      <div className="mx-auto max-w-6xl">
+        {/* Abertura */}
+        <section className="grid overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="flex flex-col justify-center p-8 lg:p-10">
+            <p className="eyebrow mb-4">{medico?.especialidade ?? "Corpo clínico"}</p>
+            <h1 className="font-display text-4xl leading-[1.02] text-foreground lg:text-5xl">
+              {saudacao}, <em>{primeiroNome}</em>.
+            </h1>
+            <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground">
+              {proxima ? (
+                <>
+                  Próximo atendimento às{" "}
+                  <span className="font-mono text-foreground">{format(new Date(proxima.data_hora), "HH:mm")}</span> com{" "}
+                  <span className="text-foreground">{proxima.paciente?.profile?.nome ?? "paciente"}</span>.
+                </>
+              ) : hoje.length > 0 ? (
+                "Não há mais atendimentos confirmados para hoje."
+              ) : (
+                "Nenhuma consulta marcada para hoje."
+              )}
+            </p>
+            {proxima && (
+              <Button onClick={() => iniciar(proxima)} className="mt-6 w-fit gap-2">
+                <PlayCircle className="h-4 w-4" />
+                {proxima.status === "Em andamento" ? "Continuar atendimento" : "Iniciar atendimento"}
+              </Button>
+            )}
           </div>
-        </div>
+          <AmbientMedia poster={consultorioImg} video="/media/dash-med.mp4" className="h-56 lg:h-auto" />
+        </section>
 
-        {/* AI Smart Summary Card */}
-        <div
-          className="relative rounded-2xl overflow-hidden border border-primary/20 p-6 lg:p-7"
-          style={{
-            background: "linear-gradient(135deg, hsl(var(--primary) / 0.08) 0%, hsl(var(--secondary)) 50%, hsl(var(--primary) / 0.06) 100%)",
-            boxShadow: "0 8px 32px -12px hsl(var(--primary) / 0.25), inset 0 1px 0 0 hsl(0 0% 100% / 0.6)",
-          }}
-        >
-          <div className="pointer-events-none absolute -top-20 -right-20 w-64 h-64 rounded-full opacity-40 blur-3xl" style={{ background: "radial-gradient(circle, hsl(var(--primary) / 0.35), transparent 70%)" }} />
-          <div className="relative flex flex-col gap-5">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-11 h-11 rounded-xl bg-primary/15 backdrop-blur-sm flex items-center justify-center border border-primary/20">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                </div>
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <h2 className="text-foreground text-lg font-bold tracking-tight">Resumo Inteligente do Dia</h2>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">IA Ativa</span>
-                </div>
-                <p className="text-xs text-muted-foreground">Análise preditiva atualizada em tempo real</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="bg-card/70 backdrop-blur-sm border border-border/40 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Padrão Detectado</p>
-                    <p className="text-sm text-foreground leading-relaxed">
-                      Você tem <strong>{consultasHoje.length}</strong> consultas hoje. {finalizadas > 0 && `${finalizadas} já finalizadas.`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-card/70 backdrop-blur-sm border border-amber-500/30 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <ShieldAlert className="h-4 w-4 text-amber-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">Alerta Clínico</p>
-                    <p className="text-sm text-foreground leading-relaxed">
-                      {proxima
-                        ? `Próxima consulta: ${proxima.paciente?.profile?.nome ?? "Paciente"} às ${format(new Date(proxima.data_hora), "HH:mm", { locale: ptBR })}.`
-                        : "Sem consultas pendentes no momento."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => navigate("/medico/painel-ia")}
-              className="self-start inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold transition-all duration-200 hover:opacity-90 shadow-[0_4px_14px_-4px_hsl(var(--primary)/0.5)] group"
-            >
-              Ver análise completa da IA
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {stats.map((stat) => (
-            <div key={stat.label} className="bg-card border border-border/40 rounded-2xl p-5 flex items-center gap-4 transition-all duration-300 hover:shadow-md" style={{ boxShadow: "0 1px 12px -4px rgba(0,0,0,0.05)" }}>
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <stat.icon className="h-5 w-5 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-foreground tracking-tight">{stat.value}</p>
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-              </div>
-              <span className="ml-auto text-xs font-medium text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                {stat.trend}
-              </span>
+        {/* Números do dia */}
+        <dl className="grid grid-cols-2 gap-px border-b border-border bg-border sm:grid-cols-4">
+          {numeros.map(([rotulo, n]) => (
+            <div key={rotulo} className="bg-background py-6 pr-4 [&:not(:first-child)]:pl-6">
+              <dt className="eyebrow">{rotulo}</dt>
+              <dd className="mt-2 font-mono text-3xl tabular-nums text-foreground">
+                {isLoading ? <Skeleton className="h-8 w-10" /> : String(n).padStart(2, "0")}
+              </dd>
             </div>
           ))}
-        </div>
+        </dl>
 
-        {/* Next Appointment */}
-        {proxima && (
-          <div className="bg-card border border-border/40 rounded-2xl p-6 flex items-center gap-5" style={{ boxShadow: "0 1px 12px -4px rgba(0,0,0,0.05)" }}>
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <CalendarCheck className="h-5 w-5 text-primary" />
+        <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+          {/* Agenda de hoje */}
+          <section aria-labelledby="hoje-titulo">
+            <div className="mb-4 flex items-baseline justify-between">
+              <h2 id="hoje-titulo" className="font-display text-3xl text-foreground">
+                Agenda de <em>hoje</em>
+              </h2>
+              <Link to="/medico/agenda" className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-4">
+                Agenda completa <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Próxima Consulta</p>
-              <p className="text-foreground font-bold text-lg tracking-tight">
-                {proxima.paciente?.profile?.nome ?? "Paciente"} — {format(new Date(proxima.data_hora), "HH:mm", { locale: ptBR })}
-              </p>
-              <p className="text-muted-foreground text-sm">{proxima.tipo}</p>
-            </div>
-            <button
-              onClick={() => navigate("/medico/anamnese")}
-              className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold transition-all duration-200 hover:opacity-90"
-            >
-              Iniciar Atendimento
-            </button>
-          </div>
-        )}
 
-        {/* Quick Actions */}
-        <div>
-          <h2 className="text-foreground text-lg font-semibold tracking-tight mb-4">Ações Rápidas</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {quickActions.map((action) => (
-              <button
-                key={action.title}
-                onClick={() => navigate(action.url)}
-                className="bg-card border border-border/40 rounded-2xl p-6 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group"
-                style={{ boxShadow: "0 1px 12px -4px rgba(0,0,0,0.05)" }}
-              >
-                <div className={`w-12 h-12 rounded-xl ${action.color} flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-105`}>
-                  <action.icon className="h-5 w-5" />
-                </div>
-                <h3 className="text-foreground font-semibold text-[15px] mb-1">{action.title}</h3>
-                <p className="text-muted-foreground text-sm">{action.description}</p>
-              </button>
-            ))}
+            {isLoading ? (
+              <div className="space-y-2">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : hoje.length === 0 ? (
+              <div className="rounded-xl border border-border bg-card">
+                <EstadoVazio
+                  imagem={vazioAgenda}
+                  titulo={<>Dia <em className="text-primary">livre</em> na agenda.</>}
+                  acao={
+                    <Button variant="outline" onClick={() => navigate("/medico/agenda")}>
+                      Agendar consulta
+                    </Button>
+                  }
+                >
+                  As solicitações dos pacientes aparecem ao lado para você confirmar.
+                </EstadoVazio>
+              </div>
+            ) : (
+              <ol className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                {hoje.map((c) => {
+                  const ativo = c.id === proxima?.id;
+                  return (
+                    <li
+                      key={c.id}
+                      className={cn(
+                        "grid grid-cols-[4rem_minmax(0,1fr)_auto] items-center gap-4 px-5 py-4",
+                        ativo && "bg-secondary/50",
+                        c.status === "Finalizado" && "opacity-60",
+                      )}
+                    >
+                      <time className="font-mono text-lg tabular-nums text-foreground">{format(new Date(c.data_hora), "HH:mm")}</time>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">{c.paciente?.profile?.nome ?? "Paciente"}</p>
+                        <p className="flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
+                          {c.tipo}
+                          <StatusConsulta status={c.status} />
+                        </p>
+                      </div>
+                      {c.status === "Aguardando" ? (
+                        <Button size="sm" variant="outline" onClick={() => mudarStatus(c, "Confirmado", "Consulta confirmada")}>
+                          Confirmar
+                        </Button>
+                      ) : c.status === "Confirmado" || c.status === "Em andamento" ? (
+                        <Button size="sm" variant={ativo ? "default" : "ghost"} onClick={() => iniciar(c)}>
+                          {c.status === "Em andamento" ? "Continuar" : "Iniciar"}
+                        </Button>
+                      ) : (
+                        <span />
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </section>
+
+          <div className="space-y-10">
+            {/* Solicitações */}
+            <section aria-labelledby="solicitacoes-titulo">
+              <h2 id="solicitacoes-titulo" className="eyebrow mb-4">
+                Solicitações de pacientes
+              </h2>
+              {solicitacoes.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  Nenhuma solicitação aguardando você.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {solicitacoes.slice(0, 5).map((c) => (
+                    <li key={c.id} className="rounded-lg border border-border bg-card p-3.5">
+                      <p className="truncate text-sm font-medium text-foreground">{c.paciente?.profile?.nome ?? "Paciente"}</p>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        {format(new Date(c.data_hora), "EEE dd/MM · HH:mm", { locale: ptBR })} · {c.tipo}
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-8 flex-1 gap-1"
+                          onClick={() => mudarStatus(c, "Confirmado", "Consulta confirmada — o paciente foi avisado")}
+                        >
+                          <Check className="h-3.5 w-3.5" /> Confirmar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 gap-1 text-muted-foreground hover:text-destructive"
+                          onClick={() => mudarStatus(c, "Cancelado", "Solicitação recusada — o paciente foi avisado")}
+                        >
+                          <X className="h-3.5 w-3.5" /> Recusar
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                  {solicitacoes.length > 5 && (
+                    <li>
+                      <Link to="/medico/agenda" className="text-sm text-primary hover:underline underline-offset-4">
+                        + {solicitacoes.length - 5} na agenda
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </section>
+
+            {/* Atalhos */}
+            <nav aria-label="Atalhos">
+              <h2 className="eyebrow mb-4">Atalhos</h2>
+              <ul className="divide-y divide-border border-y border-border">
+                {ATALHOS.map((a) => (
+                  <li key={a.url}>
+                    <Link to={a.url} className="group flex items-center gap-3 py-3.5">
+                      <a.icon className="h-4 w-4 text-primary" />
+                      <span className="flex-1">
+                        <span className="block text-sm font-medium text-foreground">{a.titulo}</span>
+                        <span className="block text-xs text-muted-foreground">{a.descricao}</span>
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
           </div>
         </div>
       </div>

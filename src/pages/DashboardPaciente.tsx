@@ -1,156 +1,212 @@
-import {
-  Home, FileText, FolderHeart, CalendarDays, CalendarClock, Pill, UserCheck, Clock, Heart, ShieldCheck, History,
-} from "lucide-react";
-import DashboardLayout, { NavItem } from "@/components/DashboardLayout";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { format, formatDistanceToNowStrict } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { ArrowRight, CalendarPlus, FileText, FolderHeart } from "lucide-react";
+import { toast } from "sonner";
+import DashboardLayout from "@/components/DashboardLayout";
+import { pacienteNavItems as navItems } from "@/lib/nav";
 import MedicoResponsavelBanner from "@/components/MedicoResponsavelBanner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useConsultasPaciente, useProximaConsultaPaciente } from "@/hooks/useConsultas";
+import { useCancelarConsultaPaciente, useConsultasPaciente, useProximaConsultaPaciente } from "@/hooks/useConsultas";
 import { usePrescricoesPaciente } from "@/hooks/usePrescricoes";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { AmbientMedia } from "@/components/AmbientMedia";
+import { StatusConsulta } from "@/components/clinico/StatusConsulta";
+import { Button } from "@/components/ui/button";
 import salaEsperaImg from "@/assets/sala-espera.webp";
-
-const navItems: NavItem[] = [
-  { title: "Início", url: "/paciente", icon: Home },
-  { title: "Minhas Receitas", url: "/paciente/receitas", icon: FileText },
-  { title: "Meu Prontuário", url: "/paciente/prontuario", icon: FolderHeart },
-  { title: "Agendamento", url: "/paciente/agendamento", icon: CalendarDays },
-  { title: "Privacidade", url: "/paciente/privacidade", icon: ShieldCheck },
-  { title: "Acessos", url: "/paciente/acessos", icon: History },
-];
 
 export default function DashboardPaciente() {
   const { profile } = useAuth();
   const { data: consultas = [] } = useConsultasPaciente();
   const { data: proxima } = useProximaConsultaPaciente();
   const { data: prescricoes = [] } = usePrescricoesPaciente();
+  const cancelar = useCancelarConsultaPaciente();
 
-  const primeiroNome = profile?.nome?.split(" ")[0] ?? "Paciente";
-
+  const primeiroNome = profile?.nome?.split(" ")[0] ?? "";
   const ultimaReceita = prescricoes[0];
-  const atividadeRecente = [
-    ...consultas.filter((c) => c.status === "Finalizado").slice(0, 2).map((c) => ({
-      text: `Consulta realizada com ${c.medico?.profile?.nome ?? "Médico"}`,
-      time: format(new Date(c.data_hora), "dd MMM", { locale: ptBR }),
-      icon: Heart,
-    })),
-    ...prescricoes.slice(0, 1).map((p) => ({
-      text: "Receita médica emitida",
-      time: format(new Date(p.data_emissao), "dd MMM", { locale: ptBR }),
-      icon: FileText,
-    })),
-    ...consultas.filter((c) => c.status === "Confirmado").slice(0, 1).map((c) => ({
-      text: "Agendamento confirmado",
-      time: format(new Date(c.data_hora), "dd MMM", { locale: ptBR }),
-      icon: Clock,
-    })),
-  ].slice(0, 3);
 
-  // Médicos distintos que o paciente já teve consulta
-  const medicos = [...new Map(
-    consultas
-      .filter((c) => c.medico)
-      .map((c) => [c.medico_id, c.medico])
-  ).values()].slice(0, 4);
+  // Linha do tempo: consultas passadas e receitas, mais recentes primeiro.
+  const historico = useMemo(() => {
+    const itens = [
+      ...consultas
+        .filter((c) => c.status === "Finalizado")
+        .map((c) => ({
+          data: new Date(c.data_hora),
+          texto: `Consulta com Dr(a). ${c.medico?.profile?.nome ?? "—"}`,
+          detalhe: c.medico?.especialidade ?? c.tipo,
+        })),
+      ...prescricoes.map((p) => ({
+        data: new Date(p.data_emissao),
+        texto: "Receita emitida",
+        detalhe: `${(p.medicamentos as unknown[])?.length ?? 0} medicamento(s)`,
+      })),
+    ];
+    return itens.sort((a, b) => b.data.getTime() - a.data.getTime()).slice(0, 5);
+  }, [consultas, prescricoes]);
 
-  const colors = ["bg-primary/15 text-primary", "bg-emerald-500/15 text-emerald-600", "bg-sky-500/15 text-sky-700", "bg-amber-500/15 text-amber-600"];
+  const medicos = useMemo(
+    () => [...new Map(consultas.filter((c) => c.medico).map((c) => [c.medico_id, c.medico!])).values()].slice(0, 4),
+    [consultas],
+  );
+
+  async function handleCancelar(id: string) {
+    try {
+      await cancelar.mutateAsync(id);
+      toast.success("Consulta cancelada. O médico foi avisado.");
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
 
   return (
     <DashboardLayout navItems={navItems}>
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="mx-auto max-w-6xl space-y-8">
         <MedicoResponsavelBanner />
 
-        {/* Hero */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="flex flex-col lg:flex-row">
-            <div className="flex-1 p-8 lg:p-10 flex flex-col justify-center">
-              <p className="eyebrow mb-4">Seu painel de saúde</p>
-              <h1 className="font-display text-4xl lg:text-5xl leading-[1.02] text-foreground mb-4">
-                Olá, <em>{primeiroNome}</em>.
-              </h1>
-              <p className="text-muted-foreground text-[15px] leading-relaxed max-w-lg">
-                Consultas, receitas e seu histórico no hospital, reunidos em um só lugar.
-              </p>
-            </div>
-            <div className="lg:w-[380px] xl:w-[440px] h-56 lg:h-auto flex-shrink-0">
-              <img src={salaEsperaImg} alt="" className="w-full h-full object-cover" loading="lazy" width={1200} height={900} />
-            </div>
-          </div>
-        </div>
+        {/* Abertura */}
+        <section className="grid overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="flex flex-col justify-center p-8 lg:p-10">
+            <p className="eyebrow mb-4">Seu painel de saúde</p>
+            <h1 className="font-display text-4xl leading-[1.02] text-foreground lg:text-5xl">
+              Olá, <em>{primeiroNome}</em>.
+            </h1>
 
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-card border border-border/40 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5" style={{ boxShadow: "0 1px 12px -4px rgba(0,0,0,0.05)" }}>
-            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4"><CalendarClock className="h-5 w-5" /></div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Próxima Consulta</p>
             {proxima ? (
-              <>
-                <p className="text-foreground text-xl font-bold tracking-tight mb-0.5">{format(new Date(proxima.data_hora), "dd MMM, HH:mm", { locale: ptBR })}</p>
-                <p className="text-muted-foreground text-sm">{proxima.medico?.profile?.nome ?? "Médico"} — {proxima.medico?.especialidade}</p>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-sm">Nenhuma consulta agendada</p>
-            )}
-          </div>
-
-          <div className="bg-card border border-border/40 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5" style={{ boxShadow: "0 1px 12px -4px rgba(0,0,0,0.05)" }}>
-            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4"><Pill className="h-5 w-5" /></div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Última Receita</p>
-            {ultimaReceita ? (
-              <>
-                <p className="text-foreground text-xl font-bold tracking-tight mb-0.5">Disponível</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-sm">Emitida em {format(new Date(ultimaReceita.data_emissao), "dd/MM/yyyy")}</span>
-                  <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">Nova</span>
+              <div className="mt-6 border-l-2 border-primary pl-4">
+                <p className="eyebrow !text-[10px]">
+                  Próxima consulta · {formatDistanceToNowStrict(new Date(proxima.data_hora), { locale: ptBR, addSuffix: true })}
+                </p>
+                <p className="mt-1 font-mono text-2xl tabular-nums text-foreground">
+                  {format(new Date(proxima.data_hora), "dd/MM · HH:mm")}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Dr(a). {proxima.medico?.profile?.nome ?? "—"} · {proxima.medico?.especialidade}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-4">
+                  <StatusConsulta status={proxima.status} />
+                  <button
+                    onClick={() => handleCancelar(proxima.id)}
+                    disabled={cancelar.isPending}
+                    className="text-xs text-muted-foreground underline-offset-4 hover:text-destructive hover:underline"
+                  >
+                    Cancelar consulta
+                  </button>
                 </div>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-sm">Nenhuma receita emitida ainda</p>
-            )}
-          </div>
-        </div>
-
-        {/* Médicos */}
-        {medicos.length > 0 && (
-          <div>
-            <h2 className="text-foreground text-lg font-semibold tracking-tight mb-4">Meus Médicos</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {medicos.map((m, i) => (
-                <div key={i} className="bg-card border border-border/40 rounded-2xl p-6 flex items-center gap-4 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5" style={{ boxShadow: "0 1px 12px -4px rgba(0,0,0,0.05)" }}>
-                  <div className={`w-12 h-12 rounded-full ${colors[i % colors.length]} flex items-center justify-center font-bold text-sm flex-shrink-0`}>
-                    {m?.profile?.nome?.split(" ").map((n: string) => n[0]).slice(0, 2).join("") ?? "M"}
-                  </div>
-                  <div>
-                    <p className="text-foreground font-semibold text-[15px]">{m?.profile?.nome ?? "Médico"}</p>
-                    <p className="text-muted-foreground text-sm">{(m as { especialidade?: string })?.especialidade}</p>
-                  </div>
-                  <UserCheck className="ml-auto h-4 w-4 text-primary/40" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Atividade Recente */}
-        <div>
-          <h2 className="text-foreground text-lg font-semibold tracking-tight mb-4">Atividade Recente</h2>
-          <div className="bg-card border border-border/40 rounded-2xl divide-y divide-border" style={{ boxShadow: "0 1px 12px -4px rgba(0,0,0,0.05)" }}>
-            {atividadeRecente.length === 0 ? (
-              <div className="flex items-center gap-4 px-6 py-8 text-center justify-center">
-                <p className="text-sm text-muted-foreground">Nenhuma atividade recente</p>
               </div>
-            ) : atividadeRecente.map((item, i) => (
-              <div key={i} className="flex items-center gap-4 px-6 py-4">
-                <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-                  <item.icon className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-sm text-foreground flex-1">{item.text}</p>
-                <span className="text-xs text-muted-foreground">{item.time}</span>
-              </div>
-            ))}
+            ) : (
+              <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground">
+                Você não tem consultas marcadas.
+              </p>
+            )}
+
+            <Button asChild variant={proxima ? "outline" : "default"} className="mt-6 w-fit gap-2">
+              <Link to="/paciente/agendamento">
+                <CalendarPlus className="h-4 w-4" /> Agendar consulta
+              </Link>
+            </Button>
+          </div>
+          <AmbientMedia poster={salaEsperaImg} video="/media/dash-pac.mp4" className="h-56 lg:h-auto" />
+        </section>
+
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+          {/* Histórico */}
+          <section aria-labelledby="historico-titulo">
+            <h2 id="historico-titulo" className="mb-4 font-display text-3xl text-foreground">
+              Seu <em>histórico</em>
+            </h2>
+            {historico.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">
+                Suas consultas finalizadas e receitas aparecem aqui.
+              </p>
+            ) : (
+              <ol className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                {historico.map((h, i) => (
+                  <li key={i} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4 px-5 py-4">
+                    <time className="font-mono text-sm tabular-nums text-muted-foreground">
+                      {format(h.data, "dd MMM yy", { locale: ptBR })}
+                    </time>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{h.texto}</p>
+                      <p className="truncate text-xs text-muted-foreground">{h.detalhe}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
+          <div className="space-y-10">
+            {/* Atalhos */}
+            <nav aria-label="Atalhos">
+              <h2 className="eyebrow mb-4">Acesso rápido</h2>
+              <ul className="divide-y divide-border border-y border-border">
+                <AtalhoItem
+                  to="/paciente/receitas"
+                  icon={FileText}
+                  titulo="Minhas receitas"
+                  descricao={
+                    ultimaReceita
+                      ? `Última em ${format(new Date(ultimaReceita.data_emissao), "dd/MM/yyyy")}`
+                      : "Nenhuma receita ainda"
+                  }
+                />
+                <AtalhoItem to="/paciente/prontuario" icon={FolderHeart} titulo="Meu prontuário" descricao="Exames, anamneses e documentos" />
+              </ul>
+            </nav>
+
+            {/* Médicos */}
+            {medicos.length > 0 && (
+              <section aria-labelledby="medicos-titulo">
+                <h2 id="medicos-titulo" className="eyebrow mb-4">
+                  Quem cuida de você
+                </h2>
+                <ul className="space-y-3">
+                  {medicos.map((m) => (
+                    <li key={m.crm} className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-xs text-secondary-foreground">
+                        {m.profile?.nome
+                          ?.split(" ")
+                          .map((n) => n[0])
+                          .slice(0, 2)
+                          .join("") ?? "—"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">Dr(a). {m.profile?.nome}</p>
+                        <p className="truncate text-xs text-muted-foreground">{m.especialidade}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </div>
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+function AtalhoItem({
+  to,
+  icon: Icon,
+  titulo,
+  descricao,
+}: {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  titulo: string;
+  descricao: string;
+}) {
+  return (
+    <li>
+      <Link to={to} className="group flex items-center gap-3 py-3.5">
+        <Icon className="h-4 w-4 text-primary" />
+        <span className="flex-1">
+          <span className="block text-sm font-medium text-foreground">{titulo}</span>
+          <span className="block text-xs text-muted-foreground">{descricao}</span>
+        </span>
+        <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+      </Link>
+    </li>
   );
 }
