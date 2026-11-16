@@ -8,6 +8,7 @@ import PageLoader from "@/components/PageLoader";
 import { useAuth } from "@/contexts/AuthContext";
 import { CONSENTIMENTOS_OBRIGATORIOS, registrarConsentimentosLote } from "@/hooks/useConsentimentos";
 import { cn } from "@/lib/utils";
+import { primeiroNome } from "@/lib/nome";
 
 const aside = {
   title: (
@@ -31,7 +32,7 @@ const PrimeiroAcesso = () => {
   if (!profile.precisa_trocar_senha) return <Navigate to={homeFor(profile.tipo)} replace />;
 
   const isPaciente = profile.tipo === "paciente";
-  const primeiroNome = profile.nome.split(" ")[0];
+  const nomeCurto = primeiroNome(profile?.nome);
 
   const salvar = async (senha: string) => {
     await trocarSenha(senha);
@@ -43,7 +44,7 @@ const PrimeiroAcesso = () => {
 
   return (
     <AuthLayout aside={aside}>
-      <AuthHeading eyebrow="Primeiro acesso" title={<>Olá, <em>{primeiroNome}</em>.</>}>
+      <AuthHeading eyebrow="Primeiro acesso" title={<>Olá, <em>{nomeCurto}</em>.</>}>
         Para sua segurança, troque a senha temporária recebida antes de continuar.
       </AuthHeading>
 

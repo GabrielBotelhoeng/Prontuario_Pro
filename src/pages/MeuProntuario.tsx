@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { maskCPF } from "@/lib/masks";
 
 const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
 
@@ -254,7 +255,7 @@ export default function MeuProntuario() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
               { label: "Nome", value: profile?.nome ?? "—", filled: !!profile?.nome },
-              { label: "CPF", value: paciente?.cpf ?? "—", filled: !!paciente?.cpf },
+              { label: "CPF", value: paciente?.cpf ? maskCPF(paciente.cpf) : "—", filled: !!paciente?.cpf },
               { label: "Data de nascimento", value: paciente?.data_nascimento ? format(new Date(paciente.data_nascimento + "T00:00:00"), "dd/MM/yyyy") : "Adicionar", filled: !!paciente?.data_nascimento },
               { label: "Tipo Sanguíneo", value: paciente?.tipo_sanguineo ?? "Adicionar", filled: !!paciente?.tipo_sanguineo },
               { label: "Peso", value: paciente?.peso != null ? `${paciente.peso} kg` : "Adicionar", filled: paciente?.peso != null },

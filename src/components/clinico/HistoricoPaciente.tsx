@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronDown } from "lucide-react";
 import { useAnamnesesDoPaciente } from "@/hooks/useAnamneses";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { nomeMedico } from "@/lib/nome";
 
 /** Linha do tempo das anamneses do paciente (todas as que o médico pode ver). */
 export function HistoricoPaciente({ pacienteId }: { pacienteId: string }) {
@@ -64,7 +65,7 @@ export function HistoricoPaciente({ pacienteId }: { pacienteId: string }) {
                       {a.queixa_principal || "Sem queixa registrada"}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {a.medico_id === user?.id ? "Você" : `Dr(a). ${a.medico?.profile?.nome ?? "—"}`}
+                      {a.medico_id === user?.id ? "Você" : nomeMedico(a.medico?.profile?.nome)}
                       {a.medico?.especialidade ? ` · ${a.medico.especialidade}` : ""}
                     </p>
                   </div>

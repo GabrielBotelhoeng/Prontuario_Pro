@@ -18,6 +18,7 @@ import { useCreatePrescricao } from "@/hooks/usePrescricoes";
 import { usePacientesDoMedico, useVincularPaciente } from "@/hooks/usePacientes";
 import { useToast } from "@/hooks/use-toast";
 import { BrandMark } from "@/components/Brand";
+import { maskCPF } from "@/lib/masks";
 
 
 interface Medication {
@@ -97,6 +98,11 @@ export default function PrescricaoDigital() {
     setMedication({ id: "", name: "", dosage: "", quantity: "", posology: "" });
   };
 
+  // O medicamento preenchido no formulário (já visível na pré-visualização) entra na receita
+  // mesmo sem clicar em "Adicionar Medicamento".
+  const medicamentosParaSalvar = () =>
+    medication.name.trim() ? [...medications, { ...medication, id: crypto.randomUUID() }] : medications;
+
   const removeMedication = (id: string) => setMedications(medications.filter((m) => m.id !== id));
   const applyAiPosology = () => { if (aiHint?.posology) setMedication({ ...medication, posology: aiHint.posology }); };
 
@@ -104,7 +110,7 @@ export default function PrescricaoDigital() {
     if (!pacienteId) { toast({ title: "Selecione um paciente", variant: "destructive" }); return; }
     setSalvando(true);
     try {
-      await createPrescricao.mutateAsync({ paciente_id: pacienteId, tipo_receita: tipoReceita, medicamentos: medications, status: "rascunho" });
+      await createPrescricao.mutateAsync({ paciente_id: pacienteId, tipo_receita: tipoReceita, medicamentos: medicamentosParaSalvar(), status: "rascunho" });
       toast({ title: "Rascunho salvo com sucesso!" });
     } catch { toast({ title: "Erro ao salvar rascunho", variant: "destructive" }); }
     finally { setSalvando(false); }
@@ -112,12 +118,14 @@ export default function PrescricaoDigital() {
 
   const finalizarReceita = async () => {
     if (!pacienteId) { toast({ title: "Selecione um paciente", variant: "destructive" }); return; }
-    if (medications.length === 0) { toast({ title: "Adicione ao menos um medicamento", variant: "destructive" }); return; }
+    const lista = medicamentosParaSalvar();
+    if (lista.length === 0) { toast({ title: "Adicione ao menos um medicamento", variant: "destructive" }); return; }
     setSalvando(true);
     try {
-      await createPrescricao.mutateAsync({ paciente_id: pacienteId, tipo_receita: tipoReceita, medicamentos: medications, status: "finalizada" });
+      await createPrescricao.mutateAsync({ paciente_id: pacienteId, tipo_receita: tipoReceita, medicamentos: lista, status: "finalizada" });
       toast({ title: "Receita finalizada!", description: "Receita salva no prontuário do paciente." });
       setMedications([]);
+      setMedication({ id: "", name: "", dosage: "", quantity: "", posology: "" });
       setPacienteId("");
     } catch { toast({ title: "Erro ao finalizar receita", variant: "destructive" }); }
     finally { setSalvando(false); }
@@ -166,7 +174,7 @@ export default function PrescricaoDigital() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     {pacientes.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.nome} — CPF {p.cpf}</SelectItem>
+                      <SelectItem key={p.id} value={p.id}>{p.nome} — CPF {maskCPF(p.cpf)}</SelectItem>
                     ))}
                     {pacientes.length === 0 && (
                       <SelectItem value="_none" disabled>Nenhum paciente vinculado</SelectItem>

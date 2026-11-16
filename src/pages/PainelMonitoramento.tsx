@@ -225,10 +225,10 @@ export default function PainelMonitoramento() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h2 className="text-lg font-semibold text-foreground tracking-tight">
-                  Análise de Diagnósticos
+                  Perfil de comorbidades
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Distribuição de patologias — Mês atual
+                  Condições marcadas nos antecedentes das anamneses — mês atual
                 </p>
               </div>
               <span className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">
