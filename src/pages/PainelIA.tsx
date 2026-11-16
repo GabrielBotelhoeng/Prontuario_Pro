@@ -50,7 +50,7 @@ const initialChat: ChatMsg[] = [
   {
     role: "ai",
     content:
-      "Olá, Dr. Carlos! Sou o assistente clínico de IA. Posso responder perguntas sobre seus pacientes, sugerir diagnósticos ou cruzar dados do consultório. Como posso ajudar?",
+      "Olá! Sou o assistente clínico de IA. Posso responder perguntas sobre seus pacientes, sugerir diagnósticos ou cruzar dados do consultório. Como posso ajudar?",
   },
 ];
 
@@ -172,7 +172,7 @@ export default function PainelIA() {
       {
         role: "ai",
         content:
-          "Analisando sua base clínica... (resposta será gerada pela IA quando o backend for conectado)",
+          "Este módulo está em desenvolvimento: a integração com o modelo de IA ainda não foi ativada nesta versão.",
       },
     ]);
     setInput("");

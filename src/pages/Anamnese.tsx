@@ -289,7 +289,8 @@ export default function Anamnese() {
               <span className="font-medium text-foreground">{paciente.nome}</span>
               <span className="font-mono text-muted-foreground">CPF {maskCPF(paciente.cpf)}</span>
               {idade !== null && <span className="font-mono text-muted-foreground">{idade} anos</span>}
-              {paciente.ultima_consulta && (
+              {/* ultima_consulta é o MAX(data_hora) — pode ser um agendamento futuro */}
+              {paciente.ultima_consulta && new Date(paciente.ultima_consulta) <= new Date() && (
                 <span className="text-muted-foreground">
                   Última consulta {format(new Date(paciente.ultima_consulta), "dd MMM yyyy", { locale: ptBR })}
                 </span>

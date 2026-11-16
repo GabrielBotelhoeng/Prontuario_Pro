@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import type { Consulta } from "@/lib/database.types";
 import consultorioImg from "@/assets/consultorio.webp";
 import vazioAgenda from "@/assets/vazio/agenda.webp";
+import { primeiroNome } from "@/lib/nome";
 
 const ATALHOS = [
   { titulo: "Nova anamnese", descricao: "Registrar atendimento", url: "/medico/anamnese", icon: ClipboardList },
@@ -47,7 +48,7 @@ export default function DashboardMedico() {
     hoje.find((c) => c.status === "Em andamento") ??
     hoje.find((c) => c.status === "Confirmado" && new Date(c.data_hora).getTime() >= limite);
 
-  const primeiroNome = profile?.nome?.split(" ")[0] ?? "";
+  const nomeCurto = primeiroNome(profile?.nome);
   const h = new Date().getHours();
   const saudacao = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
 
@@ -84,7 +85,7 @@ export default function DashboardMedico() {
           <div className="flex flex-col justify-center p-8 lg:p-10">
             <p className="eyebrow mb-4">{medico?.especialidade ?? "Corpo clínico"}</p>
             <h1 className="font-display text-4xl leading-[1.02] text-foreground lg:text-5xl">
-              {saudacao}, <em>{primeiroNome}</em>.
+              {saudacao}, <em>{nomeCurto}</em>.
             </h1>
             <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground">
               {proxima ? (

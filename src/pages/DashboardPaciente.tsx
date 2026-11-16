@@ -14,6 +14,7 @@ import { AmbientMedia } from "@/components/AmbientMedia";
 import { StatusConsulta } from "@/components/clinico/StatusConsulta";
 import { Button } from "@/components/ui/button";
 import salaEsperaImg from "@/assets/sala-espera.webp";
+import { nomeMedico, primeiroNome } from "@/lib/nome";
 
 export default function DashboardPaciente() {
   const { profile } = useAuth();
@@ -22,7 +23,7 @@ export default function DashboardPaciente() {
   const { data: prescricoes = [] } = usePrescricoesPaciente();
   const cancelar = useCancelarConsultaPaciente();
 
-  const primeiroNome = profile?.nome?.split(" ")[0] ?? "";
+  const nomeCurto = primeiroNome(profile?.nome);
   const ultimaReceita = prescricoes[0];
 
   // Linha do tempo: consultas passadas e receitas, mais recentes primeiro.
@@ -32,7 +33,7 @@ export default function DashboardPaciente() {
         .filter((c) => c.status === "Finalizado")
         .map((c) => ({
           data: new Date(c.data_hora),
-          texto: `Consulta com Dr(a). ${c.medico?.profile?.nome ?? "—"}`,
+          texto: `Consulta com ${nomeMedico(c.medico?.profile?.nome)}`,
           detalhe: c.medico?.especialidade ?? c.tipo,
         })),
       ...prescricoes.map((p) => ({
@@ -68,7 +69,7 @@ export default function DashboardPaciente() {
           <div className="flex flex-col justify-center p-8 lg:p-10">
             <p className="eyebrow mb-4">Seu painel de saúde</p>
             <h1 className="font-display text-4xl leading-[1.02] text-foreground lg:text-5xl">
-              Olá, <em>{primeiroNome}</em>.
+              Olá, <em>{nomeCurto}</em>.
             </h1>
 
             {proxima ? (
@@ -80,7 +81,7 @@ export default function DashboardPaciente() {
                   {format(new Date(proxima.data_hora), "dd/MM · HH:mm")}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Dr(a). {proxima.medico?.profile?.nome ?? "—"} · {proxima.medico?.especialidade}
+                  {nomeMedico(proxima.medico?.profile?.nome)} · {proxima.medico?.especialidade}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-4">
                   <StatusConsulta status={proxima.status} />
@@ -171,7 +172,7 @@ export default function DashboardPaciente() {
                           .join("") ?? "—"}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">Dr(a). {m.profile?.nome}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{nomeMedico(m.profile?.nome)}</p>
                         <p className="truncate text-xs text-muted-foreground">{m.especialidade}</p>
                       </div>
                     </li>

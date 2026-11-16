@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusConsulta } from "@/components/clinico/StatusConsulta";
 import { EstadoVazio } from "@/components/clinico/EstadoVazio";
 import vazioAgenda from "@/assets/vazio/agenda.webp";
+import { nomeMedico } from "@/lib/nome";
 
 const TIPOS_CONSULTA = ["Consulta de rotina", "Retorno", "Primeira consulta"] as const;
 
@@ -148,7 +149,7 @@ export default function AgendaPaciente() {
                 <SelectContent>
                   {medicos.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      Dr(a). {m.profile?.nome ?? "—"} · {m.especialidade}
+                      {nomeMedico(m.profile?.nome)} · {m.especialidade}
                       {m.id === paciente?.medico_principal_id ? " · seu médico" : ""}
                     </SelectItem>
                   ))}
@@ -248,7 +249,7 @@ export default function AgendaPaciente() {
               <p className="text-sm text-foreground">
                 {medicoSel && horario ? (
                   <>
-                    <span className="font-mono">{format(dia, "dd/MM")} · {horario}</span> com Dr(a). {medicoSel.profile?.nome}
+                    <span className="font-mono">{format(dia, "dd/MM")} · {horario}</span> com {nomeMedico(medicoSel.profile?.nome)}
                   </>
                 ) : (
                   <span className="text-muted-foreground">Escolha médico, dia e horário.</span>
@@ -282,7 +283,7 @@ export default function AgendaPaciente() {
                       <p className="font-mono text-lg tabular-nums text-foreground">
                         {format(new Date(c.data_hora), "dd/MM · HH:mm")}
                       </p>
-                      <p className="truncate text-sm text-foreground">Dr(a). {c.medico?.profile?.nome ?? "—"}</p>
+                      <p className="truncate text-sm text-foreground">{nomeMedico(c.medico?.profile?.nome)}</p>
                       <p className="truncate text-xs text-muted-foreground">{c.tipo}</p>
                       <div className="mt-3 flex items-center justify-between">
                         <StatusConsulta status={c.status} />
@@ -312,7 +313,7 @@ export default function AgendaPaciente() {
                         <p className="font-mono text-xs tabular-nums text-muted-foreground">
                           {format(new Date(c.data_hora), "dd/MM/yyyy · HH:mm")}
                         </p>
-                        <p className="truncate text-sm text-foreground">Dr(a). {c.medico?.profile?.nome ?? "—"}</p>
+                        <p className="truncate text-sm text-foreground">{nomeMedico(c.medico?.profile?.nome)}</p>
                       </div>
                       <StatusConsulta status={c.status} />
                     </li>
